@@ -2,6 +2,7 @@
 
 mod crypto;
 mod project;
+mod proxy;
 mod runner;
 mod security;
 mod storage;
@@ -106,6 +107,12 @@ enum Commands {
         #[arg(long, value_enum, default_value_t = ExportFormat::Dotenv)]
         format: ExportFormat,
     },
+    /// Start the Local AI Loopback Proxy with JIT secret acquisition
+    Proxy {
+        /// Port to listen on (binds strictly to 127.0.0.1)
+        #[arg(long, default_value_t = 4141)]
+        port: u16,
+    },
 }
 
 fn get_store(backend: StoreBackend, custom_vault: Option<PathBuf>) -> Result<Box<dyn SecretStore>> {
@@ -174,7 +181,8 @@ fn scope_to_namespace(scope: &TargetScope) -> String {
     }
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     // Apply process-level hardening (anti-core dump, disable ptrace where applicable)
     security::harden_process();
 
@@ -361,6 +369,11 @@ fn main() -> Result<()> {
                     println!("{}", json);
                 }
             }
+        }
+
+        Commands::Proxy { port } => {
+            let ns = scope_to_namespace(&target_scope);
+            proxy::start_proxy(store, ns, port).await?;
         }
     }
 
