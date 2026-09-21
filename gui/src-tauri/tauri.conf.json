@@ -12,9 +12,12 @@
   "app": {
     "windows": [
       {
-        "title": "Cloak HUD",
-        "width": 460,
-        "height": 640,
+        "title": "Cloak",
+        "width": 920,
+        "height": 620,
+        "minWidth": 720,
+        "minHeight": 480,
+        "center": true,
         "resizable": true,
         "fullscreen": false,
         "decorations": true,

@@ -88,12 +88,4 @@ export const INITIAL_SECURITY_STATUS: SecurityStatus = {
   coreDumpsDisabled: true,
 };
 
-export const INITIAL_PENDING_JIT: JitRequest = {
-  id: 'jit-req-8891',
-  agent: 'claude-code',
-  key: 'OPENAI_API_KEY',
-  timestamp: 'Just now',
-  targetEndpoint: 'http://127.0.0.1:4141/v1/chat/completions',
-  processPid: 78241,
-  status: 'pending'
-};
+export const INITIAL_PENDING_JIT: JitRequest | null = null;

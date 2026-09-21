@@ -8,48 +8,38 @@ export default {
   theme: {
     extend: {
       colors: {
-        canvas: '#0C0D0F',
-        surface: '#131519',
-        elevated: '#1A1D23',
-        inset: '#232730',
-        radar: {
-          DEFAULT: '#F59E0B',
-          core: '#F59E0B',
-          glow: '#FBBF24',
-          border: '#78350F',
-          muted: '#92400E',
-          dim: 'rgba(245, 158, 11, 0.12)',
+        canvas: '#0A0B0D',
+        sidebar: '#0F1014',
+        surface: {
+          DEFAULT: '#14161A',
+          hover: '#1B1E24',
+          active: '#22252E',
+          muted: '#181A20',
+        },
+        border: {
+          subtle: 'rgba(255, 255, 255, 0.07)',
+          hover: 'rgba(255, 255, 255, 0.14)',
+          active: 'rgba(255, 255, 255, 0.25)',
+        },
+        brand: {
+          DEFAULT: '#EDEDED',
+          dark: '#0A0B0D',
+          blue: '#4F46E5',
+          emerald: '#10B981',
         },
       },
       borderColor: {
-        subpixel: 'rgba(255, 255, 255, 0.08)',
-        'subpixel-hover': 'rgba(255, 255, 255, 0.16)',
-        'radar-border': '#78350F',
+        subtle: 'rgba(255, 255, 255, 0.07)',
+        hover: 'rgba(255, 255, 255, 0.14)',
       },
       boxShadow: {
-        'radar-glow': '0 0 12px rgba(245, 158, 11, 0.35)',
-        'radar-glow-sm': '0 0 6px rgba(245, 158, 11, 0.25)',
-        'subtle-inset': 'inset 0 1px 2px rgba(0, 0, 0, 0.6)',
-        'tactile': '0 1px 2px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+        subtle: '0 1px 2px rgba(0, 0, 0, 0.3)',
+        card: '0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04)',
+        modal: '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08)',
       },
       fontFamily: {
-        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', '"Liberation Mono"', '"Courier New"', 'monospace'],
-        sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
-      },
-      animation: {
-        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'radar-sweep': 'radarSweep 4s linear infinite',
-        'progress-30s': 'countdown 30s linear forwards',
-      },
-      keyframes: {
-        radarSweep: {
-          '0%': { transform: 'rotate(0deg)' },
-          '100%': { transform: 'rotate(360deg)' },
-        },
-        countdown: {
-          '0%': { width: '100%' },
-          '100%': { width: '0%' },
-        },
+        sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', '"Segoe UI"', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', '"Liberation Mono"', 'monospace'],
       },
     },
   },

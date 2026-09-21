@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Key, Lock, Globe, FolderGit2, ShieldCheck, Eye, EyeOff } from 'lucide-react';
+import { X, KeyRound, Globe, FolderGit2, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { SecretScope } from '../types';
 
 interface AddSecretModalProps {
@@ -40,7 +40,7 @@ export const AddSecretModal: React.FC<AddSecretModalProps> = ({
     }
   }, [isOpen, defaultScope, currentProjectName]);
 
-  // Keyboard navigation: Esc to close, Enter to submit (unless in textarea)
+  // Keyboard navigation: Esc to close
   useEffect(() => {
     if (!isOpen) return;
 
@@ -86,82 +86,86 @@ export const AddSecretModal: React.FC<AddSecretModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn select-none">
-      <div className="relative w-full max-w-md bg-surface rounded-lg border border-radar-border shadow-2xl overflow-hidden">
-        {/* Top Accent Strip */}
-        <div className="h-1 bg-gradient-to-r from-radar-border via-radar-core to-radar-glow" />
-
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm select-none">
+      <div className="relative w-full max-w-md bg-surface rounded-xl border border-border-subtle shadow-modal overflow-hidden">
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-4 py-3 bg-inset/60 border-b border-subpixel">
-          <div className="flex items-center gap-2">
-            <Key className="w-4 h-4 text-radar-core" />
-            <span className="font-mono text-xs font-bold tracking-wider text-gray-100 uppercase">
-              [ STORE HARDWARE CREDENTIAL ]
-            </span>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-surface-active flex items-center justify-center border border-border-subtle">
+              <KeyRound className="w-3.5 h-3.5 text-zinc-300" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm text-zinc-100">
+                Store Secret
+              </h3>
+              <p className="text-xs text-zinc-400">
+                Encrypted directly into hardware keystore
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded text-gray-400 hover:text-gray-200 hover:bg-elevated transition-colors cursor-pointer"
-            title="Cancel (Esc)"
+            className="p-1 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-surface-hover transition-colors cursor-pointer"
+            title="Close (Esc)"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {errorMessage && (
-            <div className="px-3 py-2 rounded bg-red-950/40 border border-red-800/80 text-red-200 font-mono text-xs">
+            <div className="px-3 py-2 rounded-lg bg-red-950/40 border border-red-800/80 text-red-200 text-xs font-mono">
               ⚠️ {errorMessage}
             </div>
           )}
 
           {/* Scope Selector */}
           <div>
-            <label className="block font-mono text-[10px] uppercase font-bold text-gray-400 mb-1.5">
-              TARGET SCOPE
+            <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+              Vault Scope
             </label>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setScope('global')}
-                className={`flex items-center justify-center gap-2 p-2 rounded text-xs font-mono border transition-all cursor-pointer ${
+                className={`flex items-center justify-center gap-2 p-2 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
                   scope === 'global'
-                    ? 'bg-radar-dim text-radar-glow border-radar-border font-bold shadow-radar-glow-sm'
-                    : 'bg-inset text-gray-400 hover:text-gray-200 border-subpixel hover:bg-elevated'
+                    ? 'bg-zinc-800 text-white border-zinc-600 shadow-sm'
+                    : 'bg-surface text-zinc-400 hover:text-zinc-200 border-border-subtle hover:bg-surface-hover'
                 }`}
               >
                 <Globe className="w-3.5 h-3.5" />
-                <span>🌐 GLOBAL (Keychain)</span>
+                <span>Global (Keychain)</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setScope('project')}
-                className={`flex items-center justify-center gap-2 p-2 rounded text-xs font-mono border transition-all cursor-pointer ${
+                className={`flex items-center justify-center gap-2 p-2 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
                   scope === 'project'
-                    ? 'bg-radar-dim text-radar-glow border-radar-border font-bold shadow-radar-glow-sm'
-                    : 'bg-inset text-gray-400 hover:text-gray-200 border-subpixel hover:bg-elevated'
+                    ? 'bg-zinc-800 text-white border-zinc-600 shadow-sm'
+                    : 'bg-surface text-zinc-400 hover:text-zinc-200 border-border-subtle hover:bg-surface-hover'
                 }`}
               >
                 <FolderGit2 className="w-3.5 h-3.5" />
-                <span>📁 PROJECT ONLY</span>
+                <span>Project Only</span>
               </button>
             </div>
           </div>
 
           {/* Project Namespace (Conditional) */}
           {scope === 'project' && (
-            <div className="animate-fadeIn">
-              <label className="block font-mono text-[10px] uppercase font-bold text-gray-400 mb-1">
-                PROJECT IDENTIFIER / NAMESPACE
+            <div>
+              <label className="block text-xs font-medium text-zinc-300 mb-1">
+                Project Name
               </label>
               <input
                 type="text"
                 value={project}
                 onChange={(e) => setProject(e.target.value)}
-                placeholder="e.g. cloak-core, payment-api"
-                className="w-full px-3 py-2 bg-inset text-gray-100 font-mono text-xs rounded border border-subpixel focus:border-radar-core focus:ring-1 focus:ring-radar-core/40 focus:outline-none"
+                placeholder="e.g. cloak-core, web-app"
+                className="w-full px-3 py-2 bg-surface-active text-zinc-100 font-mono text-xs rounded-lg border border-border-subtle focus:border-zinc-500 focus:outline-none"
               />
             </div>
           )}
@@ -169,30 +173,28 @@ export const AddSecretModal: React.FC<AddSecretModalProps> = ({
           {/* Secret Key Input */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="font-mono text-[10px] uppercase font-bold text-gray-400">
-                KEY IDENTIFIER (ENV VAR)
+              <label className="text-xs font-medium text-zinc-300">
+                Key Identifier
               </label>
-              <span className="text-[10px] font-mono text-gray-400">UPPERCASE_SNAKE</span>
+              <span className="text-[10px] text-zinc-500 font-mono">ENV_VAR_NAME</span>
             </div>
-            <div className="relative flex items-center">
-              <input
-                ref={keyInputRef}
-                type="text"
-                value={key}
-                onChange={(e) => setKey(e.target.value.toUpperCase().replace(/\s+/g, '_'))}
-                placeholder="OPENAI_API_KEY"
-                className="w-full px-3 py-2 bg-inset text-radar-glow font-mono text-xs rounded border border-subpixel focus:border-radar-core focus:ring-1 focus:ring-radar-core/40 focus:outline-none"
-              />
-            </div>
+            <input
+              ref={keyInputRef}
+              type="text"
+              value={key}
+              onChange={(e) => setKey(e.target.value.toUpperCase().replace(/\s+/g, '_'))}
+              placeholder="OPENAI_API_KEY"
+              className="w-full px-3 py-2 bg-surface-active text-zinc-100 font-mono text-xs rounded-lg border border-border-subtle focus:border-zinc-500 focus:outline-none"
+            />
           </div>
 
           {/* Secret Value Input */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="font-mono text-[10px] uppercase font-bold text-gray-400">
-                SECRET VALUE
+              <label className="text-xs font-medium text-zinc-300">
+                Secret Value
               </label>
-              <span className="text-[10px] font-mono text-gray-400">ENCRYPTED AT REST</span>
+              <span className="text-[10px] text-zinc-500">Hardware Encrypted</span>
             </div>
             <div className="relative flex items-center">
               <input
@@ -200,12 +202,12 @@ export const AddSecretModal: React.FC<AddSecretModalProps> = ({
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
                 placeholder="sk-proj-..."
-                className="w-full pl-3 pr-10 py-2 bg-inset text-gray-100 font-mono text-xs rounded border border-subpixel focus:border-radar-core focus:ring-1 focus:ring-radar-core/40 focus:outline-none"
+                className="w-full pl-3 pr-10 py-2 bg-surface-active text-zinc-100 font-mono text-xs rounded-lg border border-border-subtle focus:border-zinc-500 focus:outline-none"
               />
               <button
                 type="button"
                 onClick={() => setShowValue(!showValue)}
-                className="absolute right-2 p-1 text-gray-400 hover:text-gray-200 cursor-pointer"
+                className="absolute right-2 p-1 text-zinc-400 hover:text-zinc-200 cursor-pointer"
                 title={showValue ? 'Hide value' : 'Show value'}
               >
                 {showValue ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -213,28 +215,27 @@ export const AddSecretModal: React.FC<AddSecretModalProps> = ({
             </div>
           </div>
 
-          {/* Security Notice */}
-          <div className="flex items-center gap-2 p-2 rounded bg-inset/40 border border-subpixel text-[10px] font-mono text-gray-400">
-            <ShieldCheck className="w-3.5 h-3.5 text-radar-core flex-shrink-0" />
+          {/* Hardware notice */}
+          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-surface-active/60 border border-border-subtle text-xs text-zinc-400">
+            <ShieldCheck className="w-4 h-4 text-emerald-500 flex-shrink-0" />
             <span>Encrypted directly into Apple Keychain / Secure Enclave hardware block.</span>
           </div>
 
           {/* Modal Actions */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-subpixel">
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border-subtle">
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 rounded font-mono text-xs text-gray-400 hover:text-gray-200 hover:bg-elevated transition-colors cursor-pointer"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-surface-hover transition-colors cursor-pointer"
             >
-              CANCEL (ESC)
+              Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded font-mono text-xs font-bold bg-radar-core hover:bg-radar-glow text-black transition-all shadow-radar-glow-sm active:scale-95 cursor-pointer disabled:opacity-50"
+              className="px-4 py-1.5 rounded-lg text-xs font-medium bg-white hover:bg-zinc-200 text-zinc-950 font-semibold transition-colors cursor-pointer disabled:opacity-50"
             >
-              <Lock className="w-3.5 h-3.5" />
-              <span>{isSubmitting ? 'ENCRYPTING...' : 'STORE SECRET (ENTER)'}</span>
+              {isSubmitting ? 'Encrypting...' : 'Save Secret'}
             </button>
           </div>
         </form>

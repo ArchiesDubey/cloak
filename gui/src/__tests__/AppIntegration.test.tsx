@@ -2,36 +2,23 @@ import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { App } from '../App';
-import { api } from '../api';
 
-describe('App Integration Tests: Cloak Hybrid Workstation & HUD', () => {
+describe('App Integration Tests: Cloak Minimal Desktop Vault', () => {
   beforeEach(() => {
-    // Reset any mock state
     vi.restoreAllMocks();
   });
 
-  it('handles in-flight JIT intercept modal and reveals secrets upon response', async () => {
+  it('loads vault cleanly without any popup and renders secrets list directly', async () => {
     render(<App />);
 
-    // Check Header branding is present
-    expect(screen.getByText('[ CLOAK ]')).toBeInTheDocument();
-    expect(screen.getByText('LOCAL-FIRST HARDWARE VAULT')).toBeInTheDocument();
+    // Brand and navigation in sidebar
+    expect(screen.getByText('Cloak')).toBeInTheDocument();
+    expect(screen.getAllByText('All Secrets').length).toBeGreaterThanOrEqual(1);
 
-    // Initial load triggers JIT modal if pending
-    await waitFor(() => {
-      expect(screen.getByText('[ JIT SECURITY INTERCEPT ]')).toBeInTheDocument();
-    });
+    // Verify NO intrusive JIT modal on startup
+    expect(screen.queryByText('Agent Credential Request')).not.toBeInTheDocument();
 
-    // Respond to JIT intercept
-    const allowBtn = screen.getByText('ALLOW ONCE');
-    fireEvent.click(allowBtn);
-
-    // Modal should dismiss
-    await waitFor(() => {
-      expect(screen.queryByText('[ JIT SECURITY INTERCEPT ]')).not.toBeInTheDocument();
-    });
-
-    // Secrets list now fully visible
+    // Verify secrets load directly into view
     await waitFor(() => {
       expect(screen.getByText('OPENAI_API_KEY')).toBeInTheDocument();
       expect(screen.getByText('ANTHROPIC_API_KEY')).toBeInTheDocument();
@@ -39,14 +26,13 @@ describe('App Integration Tests: Cloak Hybrid Workstation & HUD', () => {
   });
 
   it('filters secrets when searching with SearchBar', async () => {
-    vi.spyOn(api, 'getPendingJitRequest').mockResolvedValue(null);
     render(<App />);
 
     await waitFor(() => {
       expect(screen.getByText('OPENAI_API_KEY')).toBeInTheDocument();
     });
 
-    const searchInput = screen.getByPlaceholderText(/Filter secrets by name/);
+    const searchInput = screen.getByPlaceholderText(/Search secrets by name/);
     fireEvent.change(searchInput, { target: { value: 'ANTHROPIC' } });
 
     await waitFor(() => {
@@ -55,40 +41,48 @@ describe('App Integration Tests: Cloak Hybrid Workstation & HUD', () => {
     });
   });
 
-  it('opens and closes the Add Secret modal using STORE button', async () => {
-    vi.spyOn(api, 'getPendingJitRequest').mockResolvedValue(null);
+  it('opens and closes the Add Secret modal using New Secret button', async () => {
     render(<App />);
 
     await waitFor(() => {
       expect(screen.getByText('OPENAI_API_KEY')).toBeInTheDocument();
     });
 
-    const storeBtn = screen.getByTitle('Store new secret in hardware vault (⌘N)');
-    fireEvent.click(storeBtn);
+    const newSecretBtn = screen.getByTitle('Store new secret in hardware vault (⌘N)');
+    fireEvent.click(newSecretBtn);
 
-    expect(screen.getByText('[ STORE HARDWARE CREDENTIAL ]')).toBeInTheDocument();
+    expect(screen.getByText('Store Secret')).toBeInTheDocument();
 
-    const cancelBtn = screen.getByText('CANCEL (ESC)');
+    const cancelBtn = screen.getByText('Cancel');
     fireEvent.click(cancelBtn);
 
     await waitFor(() => {
-      expect(screen.queryByText('[ STORE HARDWARE CREDENTIAL ]')).not.toBeInTheDocument();
+      expect(screen.queryByText('Store Secret')).not.toBeInTheDocument();
     });
   });
 
-  it('toggles compact HUD mode vs workstation mode', async () => {
-    vi.spyOn(api, 'getPendingJitRequest').mockResolvedValue(null);
+  it('allows user to trigger and handle JIT test simulation on demand', async () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByTitle('Collapse to Compact HUD (⌘E)')).toBeInTheDocument();
+      expect(screen.getByText('OPENAI_API_KEY')).toBeInTheDocument();
     });
 
-    const compactToggleBtn = screen.getByTitle('Collapse to Compact HUD (⌘E)');
-    fireEvent.click(compactToggleBtn);
+    // Click the test simulation button in the sidebar
+    const testJitBtn = screen.getByText('Test JIT Prompt');
+    fireEvent.click(testJitBtn);
 
+    // Modal appears upon explicit request
+    expect(screen.getByText('Agent Credential Request')).toBeInTheDocument();
+    expect(screen.getAllByText('OPENAI_API_KEY').length).toBeGreaterThanOrEqual(2);
+
+    // Respond to request
+    const allowOnceBtn = screen.getByText('Allow Once');
+    fireEvent.click(allowOnceBtn);
+
+    // Modal dismisses
     await waitFor(() => {
-      expect(screen.getByTitle('Expand to Desktop Dashboard (⌘E)')).toBeInTheDocument();
+      expect(screen.queryByText('Agent Credential Request')).not.toBeInTheDocument();
     });
   });
 });

@@ -2,14 +2,13 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { SecretCard } from '../components/SecretCard';
-import { ScopeTabs } from '../components/ScopeTabs';
 import { SearchBar } from '../components/SearchBar';
 import { JitApprovalModal } from '../components/JitApprovalModal';
 import { AddSecretModal } from '../components/AddSecretModal';
-import { Header } from '../components/Header';
+import { Sidebar } from '../components/Sidebar';
 import { SecretItem, JitRequest, ProxyStatus, SecurityStatus } from '../types';
 
-describe('GUI Component Tests: Cloak Hybrid HUD', () => {
+describe('GUI Component Tests: Cloak Minimal Desktop', () => {
   const mockSecret: SecretItem = {
     key: 'OPENAI_API_KEY',
     maskedValue: 'sk-p••••••••9999',
@@ -53,26 +52,6 @@ describe('GUI Component Tests: Cloak Hybrid HUD', () => {
     expect(revealedVal).toBeInTheDocument();
   });
 
-  it('ScopeTabs switches active scopes cleanly', () => {
-    const onSelect = vi.fn();
-    render(
-      <ScopeTabs
-        currentScope="global"
-        currentProjectName="cloak"
-        counts={{ global: 5, project: 2, all: 7 }}
-        onSelectScope={onSelect}
-      />
-    );
-
-    expect(screen.getByText('Global')).toBeInTheDocument();
-    expect(screen.getByText('Project')).toBeInTheDocument();
-    expect(screen.getByText('cloak')).toBeInTheDocument();
-
-    const projectTab = screen.getByText('Project');
-    fireEvent.click(projectTab);
-    expect(onSelect).toHaveBeenCalledWith('project');
-  });
-
   it('SearchBar updates query and responds to category click', () => {
     const onSearch = vi.fn();
     const onCategory = vi.fn();
@@ -89,7 +68,7 @@ describe('GUI Component Tests: Cloak Hybrid HUD', () => {
       />
     );
 
-    const input = screen.getByPlaceholderText(/Filter secrets by name/);
+    const input = screen.getByPlaceholderText(/Search secrets by name/);
     fireEvent.change(input, { target: { value: 'OPENAI' } });
     expect(onSearch).toHaveBeenCalledWith('OPENAI');
 
@@ -119,20 +98,20 @@ describe('GUI Component Tests: Cloak Hybrid HUD', () => {
       />
     );
 
-    expect(screen.getByText('[ JIT SECURITY INTERCEPT ]')).toBeInTheDocument();
+    expect(screen.getByText('Agent Credential Request')).toBeInTheDocument();
     expect(screen.getByText('Claude Code (PID: 42100)')).toBeInTheDocument();
     expect(screen.getByText('OPENAI_API_KEY')).toBeInTheDocument();
     expect(screen.getByText('https://api.openai.com/v1/chat/completions')).toBeInTheDocument();
 
-    const allowOnceBtn = screen.getByText('ALLOW ONCE');
+    const allowOnceBtn = screen.getByText('Allow Once');
     fireEvent.click(allowOnceBtn);
     expect(onRespond).toHaveBeenCalledWith('req_123', 'once');
 
-    const alwaysAllowBtn = screen.getByText('ALWAYS ALLOW');
+    const alwaysAllowBtn = screen.getByText('Always Allow');
     fireEvent.click(alwaysAllowBtn);
     expect(onRespond).toHaveBeenCalledWith('req_123', 'always');
 
-    const denyBtn = screen.getByText('DENY');
+    const denyBtn = screen.getByText('Deny');
     fireEvent.click(denyBtn);
     expect(onRespond).toHaveBeenCalledWith('req_123', 'deny');
   });
@@ -151,7 +130,7 @@ describe('GUI Component Tests: Cloak Hybrid HUD', () => {
       />
     );
 
-    expect(screen.getByText('[ STORE HARDWARE CREDENTIAL ]')).toBeInTheDocument();
+    expect(screen.getByText('Store Secret')).toBeInTheDocument();
 
     const keyInput = screen.getByPlaceholderText('OPENAI_API_KEY');
     const valInput = screen.getByPlaceholderText('sk-proj-...');
@@ -159,7 +138,7 @@ describe('GUI Component Tests: Cloak Hybrid HUD', () => {
     fireEvent.change(keyInput, { target: { value: 'anthropic_api_key' } });
     fireEvent.change(valInput, { target: { value: 'sk-ant-secret12345' } });
 
-    const submitBtn = screen.getByText('STORE SECRET (ENTER)');
+    const submitBtn = screen.getByText('Save Secret');
     await act(async () => {
       fireEvent.click(submitBtn);
     });
@@ -167,7 +146,7 @@ describe('GUI Component Tests: Cloak Hybrid HUD', () => {
     expect(onSave).toHaveBeenCalledWith('ANTHROPIC_API_KEY', 'sk-ant-secret12345', 'global', undefined);
   });
 
-  it('Header renders branding and security hardware status', () => {
+  it('Sidebar renders branding, vault navigation, and hardware status', () => {
     const mockProxy: ProxyStatus = {
       running: true,
       port: 4141,
@@ -181,23 +160,29 @@ describe('GUI Component Tests: Cloak Hybrid HUD', () => {
       coreDumpsDisabled: true,
     };
 
-    const onToggleCompact = vi.fn();
-
     render(
-      <Header
-        isCompact={true}
-        onToggleCompact={onToggleCompact}
+      <Sidebar
+        currentScope="all"
+        onSelectScope={vi.fn()}
+        selectedProject={null}
+        onSelectProject={vi.fn()}
+        projectList={['cloak-core', 'web-app']}
+        counts={{ all: 7, global: 4, project: 3 }}
         proxyStatus={mockProxy}
         onToggleProxy={vi.fn()}
         securityStatus={mockSecurity}
         onToggleLock={vi.fn()}
+        onSimulateJit={vi.fn()}
         pendingJitCount={0}
-        onOpenJitModal={vi.fn()}
       />
     );
 
-    expect(screen.getByText('[ CLOAK ]')).toBeInTheDocument();
-    expect(screen.getByText('LOCAL-FIRST HARDWARE VAULT')).toBeInTheDocument();
-    expect(screen.getByText('UNLOCKED')).toBeInTheDocument();
+    expect(screen.getByText('Cloak')).toBeInTheDocument();
+    expect(screen.getByText('v0.1')).toBeInTheDocument();
+    expect(screen.getByText('All Secrets')).toBeInTheDocument();
+    expect(screen.getByText('Global (Keychain)')).toBeInTheDocument();
+    expect(screen.getByText('cloak-core')).toBeInTheDocument();
+    expect(screen.getByText('AI Proxy :4141')).toBeInTheDocument();
+    expect(screen.getByText('Hardware Enclave')).toBeInTheDocument();
   });
 });

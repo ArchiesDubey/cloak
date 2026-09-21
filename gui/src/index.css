@@ -8,7 +8,12 @@
   }
 
   body {
+    background-color: #0A0B0D;
+    color: #EDEDED;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-font-smoothing: antialiased;
   }
 
   .font-mono {
@@ -17,32 +22,21 @@
   }
 }
 
-@layer utilities {
-  .subpixel-border {
-    border-width: 1px;
-    border-color: rgba(255, 255, 255, 0.08);
-  }
+/* Custom minimal scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
 
-  .subpixel-border-amber {
-    border-width: 1px;
-    border-color: #78350F;
-  }
+::-webkit-scrollbar-track {
+  background: transparent;
+}
 
-  .bg-grid-pattern {
-    background-size: 24px 24px;
-    background-image: 
-      linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-  }
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+}
 
-  .scanline {
-    background: linear-gradient(
-      to bottom,
-      rgba(255, 255, 255, 0),
-      rgba(255, 255, 255, 0) 50%,
-      rgba(0, 0, 0, 0.3) 50%,
-      rgba(0, 0, 0, 0.3)
-    );
-    background-size: 100% 4px;
-  }
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }

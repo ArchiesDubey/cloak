@@ -22,31 +22,31 @@ export const SecretList: React.FC<SecretListProps> = ({
 }) => {
   if (secrets.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 text-center bg-surface/50 rounded-lg border border-dashed border-subpixel select-none">
-        <div className="w-10 h-10 rounded-full bg-inset flex items-center justify-center mb-3 border border-subpixel">
-          <KeyRound className="w-5 h-5 text-gray-400" />
+      <div className="flex flex-col items-center justify-center p-12 text-center bg-surface/40 rounded-xl border border-dashed border-border-subtle select-none">
+        <div className="w-10 h-10 rounded-full bg-surface-active flex items-center justify-center mb-3 border border-border-subtle text-zinc-400">
+          <KeyRound className="w-4 h-4" />
         </div>
-        <h3 className="font-mono text-sm font-semibold text-gray-300">
-          {searchQuery ? 'NO MATCHING SECRETS FOUND' : 'NO SECRETS STORED IN THIS SCOPE'}
+        <h3 className="text-sm font-semibold text-zinc-200">
+          {searchQuery ? 'No matching secrets found' : 'No secrets stored in this scope'}
         </h3>
-        <p className="text-xs text-gray-400 max-w-xs mt-1 font-mono">
+        <p className="text-xs text-zinc-400 max-w-sm mt-1">
           {searchQuery
-            ? `No credentials matching "${searchQuery}". Press Esc to clear filter.`
-            : 'Add credentials to your OS hardware store or launch a CLI injector session.'}
+            ? `No credentials match "${searchQuery}". Clear your search query to see all items.`
+            : 'Store API keys, tokens, or environment credentials directly into your OS hardware keystore.'}
         </p>
         <button
           onClick={onAddSecretClick}
-          className="mt-4 flex items-center gap-1.5 px-3 py-1.5 rounded bg-radar-core hover:bg-radar-glow text-black font-bold text-xs font-mono transition-all shadow-radar-glow-sm cursor-pointer active:scale-95"
+          className="mt-4 flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-white hover:bg-zinc-200 text-zinc-950 font-semibold text-xs transition-colors cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5" />
-          <span>STORE NEW SECRET (⌘N)</span>
+          <span>New Secret (⌘N)</span>
         </button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       {secrets.map((secret) => (
         <SecretCard
           key={`${secret.scope}-${secret.key}`}

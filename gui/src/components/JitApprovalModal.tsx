@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Bot, Radio, Terminal, Check, X, ShieldCheck, Zap } from 'lucide-react';
+import { Bot, Terminal, X, Shield, KeyRound } from 'lucide-react';
 import { JitRequest } from '../types';
 
 interface JitApprovalModalProps {
@@ -39,35 +39,32 @@ export const JitApprovalModal: React.FC<JitApprovalModalProps> = ({
   if (!request) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn select-none">
-      <div className="relative w-full max-w-lg bg-surface rounded-lg border-2 border-radar-core shadow-2xl overflow-hidden shadow-radar-glow">
-        {/* Animated Warning Bar */}
-        <div className="h-1.5 bg-radar-core animate-pulse" />
-
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm select-none">
+      <div className="relative w-full max-w-md bg-surface rounded-xl border border-border-subtle shadow-modal overflow-hidden">
         {/* Modal Top Banner */}
-        <div className="flex items-center justify-between px-5 py-3 bg-inset/90 border-b border-subpixel">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle">
           <div className="flex items-center gap-2.5">
-            <div className="w-6 h-6 rounded bg-radar-dim flex items-center justify-center border border-radar-border">
-              <Radio className="w-3.5 h-3.5 text-radar-glow animate-spin" />
+            <div className="w-8 h-8 rounded-lg bg-surface-active flex items-center justify-center border border-border-subtle text-white">
+              <Shield className="w-4 h-4 text-zinc-300" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-mono text-xs font-black tracking-widest text-radar-glow uppercase">
-                  [ JIT SECURITY INTERCEPT ]
-                </span>
-                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-radar-border text-radar-glow font-bold animate-pulse">
-                  SOCKET PAUSED
+                <h3 className="font-semibold text-sm text-zinc-100">
+                  Agent Credential Request
+                </h3>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-800/60">
+                  Paused
                 </span>
               </div>
-              <p className="text-[10px] font-mono text-gray-400">
-                HTTP request paused in-flight &bull; Proxy 127.0.0.1:4141
+              <p className="text-xs text-zinc-400">
+                In-flight HTTP intercept via 127.0.0.1:4141
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded text-gray-400 hover:text-gray-200 hover:bg-elevated cursor-pointer"
-            title="Dismiss HUD (Esc)"
+            className="p-1 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-surface-hover transition-colors cursor-pointer"
+            title="Dismiss (Esc)"
           >
             <X className="w-4 h-4" />
           </button>
@@ -75,95 +72,80 @@ export const JitApprovalModal: React.FC<JitApprovalModalProps> = ({
 
         {/* Request Inspection Content */}
         <div className="p-5 space-y-4">
-          <div className="p-3 rounded bg-inset border border-subpixel space-y-2 font-mono text-xs">
+          <div className="p-3.5 rounded-lg bg-surface-active/60 border border-border-subtle space-y-2.5 text-xs">
             {/* Agent / Process Row */}
             <div className="flex items-center justify-between">
-              <span className="text-gray-400 flex items-center gap-1.5">
-                <Bot className="w-3.5 h-3.5 text-radar-core" />
-                REQUESTING AGENT:
+              <span className="text-zinc-400 flex items-center gap-1.5">
+                <Bot className="w-3.5 h-3.5 text-zinc-500" />
+                Requesting Agent
               </span>
-              <span className="text-gray-100 font-bold bg-surface px-2 py-0.5 rounded border border-subpixel">
+              <span className="font-mono text-zinc-200 font-medium">
                 {request.agent} {request.processPid ? `(PID: ${request.processPid})` : ''}
               </span>
             </div>
 
             {/* Target Endpoint */}
             <div className="flex items-center justify-between">
-              <span className="text-gray-400 flex items-center gap-1.5">
-                <Terminal className="w-3.5 h-3.5 text-radar-core" />
-                TARGET ENDPOINT:
+              <span className="text-zinc-400 flex items-center gap-1.5">
+                <Terminal className="w-3.5 h-3.5 text-zinc-500" />
+                Target Endpoint
               </span>
-              <span className="text-gray-300 font-mono text-[11px] truncate max-w-[280px]">
+              <span className="text-zinc-300 font-mono text-[11px] truncate max-w-[220px]">
                 {request.targetEndpoint}
               </span>
             </div>
 
             {/* Requested Credential */}
-            <div className="flex items-center justify-between pt-1 border-t border-white/5">
-              <span className="text-gray-400 flex items-center gap-1.5">
-                <Zap className="w-3.5 h-3.5 text-radar-glow" />
-                REQUESTED KEY:
+            <div className="flex items-center justify-between pt-2 border-t border-border-subtle">
+              <span className="text-zinc-300 font-medium flex items-center gap-1.5">
+                <KeyRound className="w-3.5 h-3.5 text-zinc-400" />
+                Requested Key
               </span>
-              <span className="text-radar-glow font-mono font-bold text-sm bg-radar-dim px-2 py-0.5 rounded border border-radar-border">
+              <span className="text-white font-mono font-bold text-xs bg-surface px-2 py-0.5 rounded border border-border-subtle">
                 {request.key}
               </span>
             </div>
           </div>
 
-          <p className="text-xs text-gray-300 font-mono leading-relaxed">
-            The agent initiated an outbound AI call missing credentials. Injecting authorization directly into process memory without session restart.
+          <p className="text-xs text-zinc-400 leading-relaxed">
+            The agent initiated an outbound AI call missing credentials. Authorizing injects the key directly into process memory without session restart.
           </p>
 
           {/* Action Decision Buttons */}
-          <div className="grid grid-cols-3 gap-2.5 pt-2">
+          <div className="grid grid-cols-3 gap-2 pt-2">
             {/* Deny Button */}
             <button
               onClick={() => onRespond(request.id, 'deny')}
-              className="flex flex-col items-center justify-center p-3 rounded bg-inset hover:bg-red-950/40 border border-subpixel hover:border-red-600/80 text-gray-300 hover:text-red-200 transition-all cursor-pointer group active:scale-95"
+              className="flex flex-col items-center justify-center p-2.5 rounded-lg bg-surface hover:bg-rose-950/40 border border-border-subtle hover:border-rose-900/60 text-zinc-300 hover:text-rose-300 transition-colors cursor-pointer"
             >
-              <div className="flex items-center gap-1 font-mono text-xs font-bold">
-                <X className="w-3.5 h-3.5 text-red-400" />
-                <span>DENY</span>
-              </div>
-              <span className="text-[9px] font-mono text-gray-400 group-hover:text-red-300 mt-0.5">
-                Drop Socket [D]
-              </span>
+              <span className="text-xs font-semibold">Deny</span>
+              <span className="text-[10px] text-zinc-500 mt-0.5 font-mono">[D]</span>
             </button>
 
             {/* Allow Once Button */}
             <button
               onClick={() => onRespond(request.id, 'once')}
-              className="flex flex-col items-center justify-center p-3 rounded bg-elevated hover:bg-inset border border-subpixel hover:border-radar-border text-gray-200 hover:text-white transition-all cursor-pointer group active:scale-95"
+              className="flex flex-col items-center justify-center p-2.5 rounded-lg bg-surface hover:bg-surface-hover border border-border-subtle hover:border-zinc-700 text-zinc-200 transition-colors cursor-pointer"
             >
-              <div className="flex items-center gap-1 font-mono text-xs font-bold text-gray-100">
-                <Check className="w-3.5 h-3.5 text-radar-core" />
-                <span>ALLOW ONCE</span>
-              </div>
-              <span className="text-[9px] font-mono text-gray-400 group-hover:text-gray-300 mt-0.5">
-                This Request [O]
-              </span>
+              <span className="text-xs font-semibold">Allow Once</span>
+              <span className="text-[10px] text-zinc-500 mt-0.5 font-mono">[O]</span>
             </button>
 
             {/* Always Allow Button */}
             <button
               onClick={() => onRespond(request.id, 'always')}
-              className="flex flex-col items-center justify-center p-3 rounded bg-radar-core hover:bg-radar-glow border border-amber-300 text-black font-bold transition-all cursor-pointer shadow-radar-glow active:scale-95 group"
+              className="flex flex-col items-center justify-center p-2.5 rounded-lg bg-white hover:bg-zinc-200 text-zinc-950 transition-colors cursor-pointer font-semibold shadow-sm"
             >
-              <div className="flex items-center gap-1 font-mono text-xs font-black">
-                <ShieldCheck className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>ALWAYS ALLOW</span>
-              </div>
-              <span className="text-[9px] font-mono text-amber-950 group-hover:text-black mt-0.5 font-semibold">
-                Remember Agent [A]
-              </span>
+              <span className="text-xs font-bold">Always Allow</span>
+              <span className="text-[10px] text-zinc-600 mt-0.5 font-mono">[A]</span>
             </button>
           </div>
         </div>
 
         {/* Footer info */}
-        <div className="px-5 py-2 bg-inset/40 border-t border-subpixel flex items-center justify-between text-[10px] font-mono text-gray-400">
-          <span>Shortcuts: [D] Deny &bull; [O] Once &bull; [A] Always &bull; [Esc] Dismiss</span>
-          <span className="text-radar-glow font-mono">ENCLAVE VERIFIED</span>
+        <div className="px-5 py-2.5 bg-surface-active/40 border-t border-border-subtle flex items-center justify-between text-[11px] text-zinc-500">
+          <span>Shortcuts: [D] Deny • [O] Once • [A] Always</span>
+          <span className="text-emerald-400 font-medium">Verified</span>
         </div>
       </div>
     </div>
