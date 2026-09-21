@@ -101,7 +101,33 @@ cloak export --format bash
 cloak export --format json
 ```
 
-### 7. Headless / Server / CI Mode (`--store file`)
+### 7. Local AI Loopback Proxy (`cloak proxy`)
+Solve mid-session key requests from AI coding agents (Claude Code, Aider, Cursor) without restarting sessions:
+
+```bash
+# Start the proxy (binds to loopback 127.0.0.1:4141)
+cloak proxy
+```
+
+Then point your AI tools or terminal environment to it:
+```bash
+export OPENAI_BASE_URL="http://127.0.0.1:4141/v1"
+export ANTHROPIC_BASE_URL="http://127.0.0.1:4141"
+```
+
+**What happens when a key is missing midway?**
+The proxy **pauses the HTTP request** without dropping the socket, prompts you securely on your terminal:
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ [CLOAK JIT PROXY] ⏸ Request Paused: Key Missing            │
+├─────────────────────────────────────────────────────────────┤
+│ An AI tool or agent is requesting access to 'OPENAI_API_KEY'│
+│ Enter value below to authorize & continue without restart:  │
+└─────────────────────────────────────────────────────────────┘
+```
+Once entered, it saves the key to Cloak and immediately resumes the request!
+
+### 8. Headless / Server / CI Mode (`--store file`)
 When running on headless Linux servers or Docker containers without a desktop keyring:
 ```bash
 export CLOAK_MASTER_KEY="your-secure-passphrase"
