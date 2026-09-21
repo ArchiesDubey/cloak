@@ -84,22 +84,22 @@ export const SecretCard: React.FC<SecretCardProps> = ({
   const renderCategoryIcon = () => {
     switch (secret.category) {
       case 'database':
-        return <Database className="w-3.5 h-3.5 text-sky-400" />;
+        return <Database className="w-3.5 h-3.5 text-burnrate-ample" />;
       case 'token':
-        return <Lock className="w-3.5 h-3.5 text-amber-400" />;
+        return <Lock className="w-3.5 h-3.5 text-burnrate-watch" />;
       case 'api-key':
       default:
-        return <KeyRound className="w-3.5 h-3.5 text-zinc-400" />;
+        return <KeyRound className="w-3.5 h-3.5 text-[#808080]" />;
     }
   };
 
   return (
-    <div className="relative group bg-surface hover:bg-surface-hover rounded-lg border border-border-subtle hover:border-border-hover transition-colors p-3.5 select-none">
-      {/* Hairline clipboard countdown indicator */}
+    <div className="relative group bg-surface hover:bg-surface-hover rounded-lg border border-border-subtle hover:border-border-track transition-all duration-150 ease-spring active:scale-[0.99] p-3.5 select-none shadow-card">
+      {/* Burnrate-style hairline countdown progress bar */}
       {isCopied && (
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-zinc-800 overflow-hidden rounded-t-lg">
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-border-track overflow-hidden rounded-t-lg">
           <div
-            className="h-full bg-emerald-500 transition-all duration-1000 ease-linear"
+            className="h-full bg-burnrate-ample shadow-glow-ample transition-all duration-1000 ease-linear"
             style={{ width: `${(copyTimeLeft / 30) * 100}%` }}
           />
         </div>
@@ -108,42 +108,42 @@ export const SecretCard: React.FC<SecretCardProps> = ({
       {/* Top Header: Key Name, Scope Badge, and Hardware Verification */}
       <div className="flex items-center justify-between gap-3 mb-2">
         <div className="flex items-center gap-2.5 min-w-0">
-          <span className="p-1 rounded bg-surface-active text-zinc-300 flex-shrink-0">
+          <span className="p-1 rounded bg-surface-active text-zinc-300 flex-shrink-0 border border-border-subtle">
             {renderCategoryIcon()}
           </span>
-          <span className="font-mono text-xs font-semibold text-zinc-100 tracking-tight truncate select-text">
+          <span className="font-mono text-xs font-semibold text-white tracking-tight truncate select-text">
             {secret.key}
           </span>
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
           {secret.scope === 'project' ? (
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800/80 text-zinc-300 border border-zinc-700/60">
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-surface-active text-zinc-300 border border-border-subtle">
               {secret.project || 'project'}
             </span>
           ) : (
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800/80 text-zinc-300 border border-zinc-700/60 font-medium">
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-surface-active text-zinc-300 border border-border-subtle font-medium">
               GLOBAL
             </span>
           )}
 
-          <span className="hidden sm:inline-flex items-center gap-1 text-[10px] text-zinc-400">
-            <ShieldCheck className="w-3 h-3 text-emerald-500" />
+          <span className="hidden sm:inline-flex items-center gap-1 text-[10px] text-[#808080]">
+            <ShieldCheck className="w-3 h-3 text-burnrate-ample" />
             Keychain
           </span>
         </div>
       </div>
 
       {/* Value Row & Quick Actions */}
-      <div className="flex items-center justify-between gap-3 pt-2 border-t border-border-subtle/60">
+      <div className="flex items-center justify-between gap-3 pt-2.5 border-t border-border-subtle">
         {/* Value Display */}
-        <div className="min-w-0 flex-1 font-mono text-xs text-zinc-400 select-text truncate">
+        <div className="min-w-0 flex-1 font-mono text-xs text-[#808080] select-text truncate">
           {isLoadingReveal ? (
-            <span className="text-zinc-500 animate-pulse">Decrypting with Secure Enclave...</span>
+            <span className="text-[#6E6E73] animate-pulse">Decrypting with Secure Enclave...</span>
           ) : isRevealed && revealedValue ? (
-            <span className="text-zinc-100 font-medium break-all">{revealedValue}</span>
+            <span className="text-white font-medium break-all">{revealedValue}</span>
           ) : (
-            <span className="text-zinc-400 tracking-wider font-mono">
+            <span className="text-[#808080] tracking-wider font-mono">
               {secret.maskedValue}
             </span>
           )}
@@ -155,29 +155,29 @@ export const SecretCard: React.FC<SecretCardProps> = ({
           <button
             onClick={handleToggleReveal}
             disabled={isLoadingReveal}
-            className={`p-1.5 rounded-md transition-colors cursor-pointer border ${
+            className={`p-1.5 rounded-md transition-all duration-150 ease-spring cursor-pointer border ${
               isRevealed
-                ? 'bg-zinc-800 text-white border-zinc-700'
-                : 'bg-surface hover:bg-surface-active text-zinc-400 hover:text-zinc-200 border-border-subtle'
+                ? 'bg-surface-active text-white border-border-track'
+                : 'bg-surface hover:bg-surface-hover text-[#808080] hover:text-white border-border-subtle'
             }`}
             title={isRevealed ? 'Hide secret value' : 'Decrypt & reveal value'}
           >
             {isRevealed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
           </button>
 
-          {/* Copy Button */}
+          {/* Copy Button with Burnrate Ample Accent */}
           <button
             onClick={handleCopy}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono transition-colors cursor-pointer border ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono transition-all duration-150 ease-spring cursor-pointer border ${
               isCopied
-                ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
-                : 'bg-surface hover:bg-surface-active text-zinc-300 hover:text-white border-border-subtle'
+                ? 'bg-[#00FF88]/10 text-burnrate-ample border-[#00FF88]/40 shadow-glow-ample font-semibold'
+                : 'bg-surface hover:bg-surface-hover text-zinc-300 hover:text-white border-border-subtle'
             }`}
             title="Copy to clipboard (auto-wipes in 30s)"
           >
             {isCopied ? (
               <>
-                <Check className="w-3.5 h-3.5 text-emerald-400 stroke-[2.5]" />
+                <Check className="w-3.5 h-3.5 text-burnrate-ample stroke-[2.5]" />
                 <span>Copied ({copyTimeLeft}s)</span>
               </>
             ) : (
@@ -188,19 +188,19 @@ export const SecretCard: React.FC<SecretCardProps> = ({
             )}
           </button>
 
-          {/* Delete Button */}
+          {/* Delete Button with Critical Accent */}
           {isDeleting ? (
-            <div className="flex items-center gap-1 bg-red-950/80 p-0.5 rounded-md border border-red-800">
+            <div className="flex items-center gap-1 bg-[#FF3F00]/10 p-0.5 rounded-md border border-burnrate-critical/50">
               <button
                 onClick={handleDeleteConfirm}
-                className="px-2 py-0.5 text-[10px] font-mono font-bold text-red-200 hover:text-white cursor-pointer"
+                className="px-2 py-0.5 text-[10px] font-mono font-bold text-burnrate-critical hover:text-white cursor-pointer"
                 title="Confirm deletion"
               >
                 Confirm
               </button>
               <button
                 onClick={() => setIsDeleting(false)}
-                className="px-1.5 py-0.5 text-[10px] font-mono text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                className="px-1.5 py-0.5 text-[10px] font-mono text-[#808080] hover:text-white cursor-pointer"
                 title="Cancel deletion"
               >
                 Cancel
@@ -209,7 +209,7 @@ export const SecretCard: React.FC<SecretCardProps> = ({
           ) : (
             <button
               onClick={() => setIsDeleting(true)}
-              className="p-1.5 rounded-md text-zinc-400 hover:text-rose-400 hover:bg-rose-950/30 border border-transparent hover:border-rose-900/40 transition-colors cursor-pointer"
+              className="p-1.5 rounded-md text-[#808080] hover:text-burnrate-critical hover:bg-[#FF3F00]/10 border border-transparent hover:border-burnrate-critical/30 transition-colors cursor-pointer"
               title="Delete secret from hardware store"
             >
               <Trash2 className="w-3.5 h-3.5" />

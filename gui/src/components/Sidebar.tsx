@@ -21,6 +21,31 @@ interface SidebarProps {
   pendingJitCount: number;
 }
 
+// Burnrate-inspired StatusRing: 3/4 animated circle at 1.4s period
+const StatusRing: React.FC<{ active: boolean; color?: string }> = ({ active, color = '#00FF88' }) => {
+  if (!active) {
+    return (
+      <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" stroke="#6E6E73" strokeWidth="2.5" fill="none" />
+      </svg>
+    );
+  }
+  return (
+    <svg className="w-3.5 h-3.5 animate-status-spin flex-shrink-0" viewBox="0 0 24 24">
+      <circle
+        cx="12"
+        cy="12"
+        r="9"
+        stroke={color}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeDasharray="42.4 14.1"
+        fill="none"
+      />
+    </svg>
+  );
+};
+
 export const Sidebar: React.FC<SidebarProps> = ({
   currentScope,
   onSelectScope,
@@ -47,7 +72,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="font-semibold text-sm tracking-tight text-white">Cloak</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface border border-border-subtle text-zinc-400 font-mono">
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface border border-border-subtle text-[#808080] font-mono">
                   v0.1
                 </span>
               </div>
@@ -57,55 +82,51 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Vault Navigation List */}
         <div className="p-3 space-y-1">
-          <div className="px-2 pt-2 pb-1 text-[11px] font-medium tracking-wider text-zinc-400 uppercase">
+          <div className="px-2 pt-2 pb-1 text-[11px] font-medium tracking-wider text-[#6E6E73] uppercase">
             Vault Scopes
           </div>
 
           {/* All Secrets */}
           <button
-            onClick={() => {
-              onSelectScope('all');
-            }}
-            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+            onClick={() => onSelectScope('all')}
+            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ease-spring active:scale-[0.98] cursor-pointer ${
               currentScope === 'all'
-                ? 'bg-surface text-white border border-border-subtle'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-surface-hover'
+                ? 'bg-surface text-white border border-border-subtle shadow-sm'
+                : 'text-[#808080] hover:text-white hover:bg-surface-hover'
             }`}
           >
             <div className="flex items-center gap-2">
-              <KeyRound className="w-3.5 h-3.5 text-zinc-400" />
+              <KeyRound className="w-3.5 h-3.5 text-[#808080]" />
               <span>All Secrets</span>
             </div>
-            <span className="text-[11px] font-mono text-zinc-400">
+            <span className="text-[11px] font-mono text-[#808080]">
               {counts.all}
             </span>
           </button>
 
           {/* Global (Keychain) */}
           <button
-            onClick={() => {
-              onSelectScope('global');
-            }}
-            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+            onClick={() => onSelectScope('global')}
+            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ease-spring active:scale-[0.98] cursor-pointer ${
               currentScope === 'global'
-                ? 'bg-surface text-white border border-border-subtle'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-surface-hover'
+                ? 'bg-surface text-white border border-border-subtle shadow-sm'
+                : 'text-[#808080] hover:text-white hover:bg-surface-hover'
             }`}
           >
             <div className="flex items-center gap-2">
-              <Globe className="w-3.5 h-3.5 text-zinc-400" />
+              <Globe className="w-3.5 h-3.5 text-[#808080]" />
               <span>Global (Keychain)</span>
             </div>
-            <span className="text-[11px] font-mono text-zinc-400">
+            <span className="text-[11px] font-mono text-[#808080]">
               {counts.global}
             </span>
           </button>
 
           {/* Project Scopes Section */}
           <div className="pt-3">
-            <div className="px-2 pb-1 text-[11px] font-medium tracking-wider text-zinc-400 uppercase flex items-center justify-between">
+            <div className="px-2 pb-1 text-[11px] font-medium tracking-wider text-[#6E6E73] uppercase flex items-center justify-between">
               <span>Projects</span>
-              <span className="text-[10px] font-mono text-zinc-400">{projectList.length}</span>
+              <span className="text-[10px] font-mono text-[#808080]">{projectList.length}</span>
             </div>
 
             {projectList.map((proj) => {
@@ -117,14 +138,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onSelectScope('project');
                     onSelectProject(proj);
                   }}
-                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ease-spring active:scale-[0.98] cursor-pointer ${
                     isSelected
-                      ? 'bg-surface text-white border border-border-subtle'
-                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-surface-hover'
+                      ? 'bg-surface text-white border border-border-subtle shadow-sm'
+                      : 'text-[#808080] hover:text-white hover:bg-surface-hover'
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <FolderGit2 className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" />
+                    <FolderGit2 className="w-3.5 h-3.5 text-[#808080] flex-shrink-0" />
                     <span className="truncate font-mono text-[11px]">{proj}</span>
                   </div>
                 </button>
@@ -139,51 +160,51 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Keystore Status Card */}
         <button
           onClick={onToggleLock}
-          className="w-full flex items-center justify-between p-2 rounded-md bg-surface hover:bg-surface-hover border border-border-subtle text-left transition-colors cursor-pointer"
+          className="w-full flex items-center justify-between p-2 rounded-lg bg-surface hover:bg-surface-hover border border-border-subtle text-left transition-all duration-150 ease-spring active:scale-[0.98] cursor-pointer"
           title="Toggle Hardware Keystore lock"
         >
           <div className="flex items-center gap-2">
             {securityStatus.isUnlocked ? (
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <ShieldCheck className="w-3.5 h-3.5 text-burnrate-ample" />
             ) : (
-              <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+              <ShieldAlert className="w-3.5 h-3.5 text-burnrate-critical" />
             )}
             <div className="flex flex-col">
-              <span className="text-[11px] font-medium text-zinc-200">
+              <span className="text-[11px] font-medium text-white">
                 {securityStatus.isUnlocked ? 'Hardware Enclave' : 'Vault Locked'}
               </span>
-              <span className="text-[10px] text-zinc-400 font-mono">
+              <span className="text-[10px] text-[#808080] font-mono">
                 {securityStatus.biometricType}
               </span>
             </div>
           </div>
-          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-surface-active text-zinc-300">
+          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-surface-active text-white border border-border-subtle">
             {securityStatus.isUnlocked ? 'Active' : 'Locked'}
           </span>
         </button>
 
-        {/* Local Proxy Status Card */}
+        {/* Local Proxy Status Card with Burnrate StatusRing */}
         <button
           onClick={onToggleProxy}
-          className="w-full flex items-center justify-between p-2 rounded-md bg-surface hover:bg-surface-hover border border-border-subtle text-left transition-colors cursor-pointer"
+          className="w-full flex items-center justify-between p-2 rounded-lg bg-surface hover:bg-surface-hover border border-border-subtle text-left transition-all duration-150 ease-spring active:scale-[0.98] cursor-pointer"
           title="Toggle Local AI Loopback Proxy"
         >
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${proxyStatus.running ? 'bg-emerald-500 shadow-sm' : 'bg-zinc-600'}`} />
+          <div className="flex items-center gap-2.5">
+            <StatusRing active={proxyStatus.running} color="#00FF88" />
             <div className="flex flex-col">
-              <span className="text-[11px] font-medium text-zinc-200">
+              <span className="text-[11px] font-medium text-white">
                 AI Proxy :{proxyStatus.port}
               </span>
-              <span className="text-[10px] text-zinc-400">
+              <span className="text-[10px] text-[#808080]">
                 {proxyStatus.running ? '127.0.0.1 loopback' : 'Inactive'}
               </span>
             </div>
           </div>
           <span
-            className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+            className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${
               proxyStatus.running
-                ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-800/60'
-                : 'bg-surface-active text-zinc-400'
+                ? 'bg-[#00FF88]/10 text-burnrate-ample border-[#00FF88]/30 font-semibold'
+                : 'bg-surface-active text-[#808080] border-border-subtle'
             }`}
           >
             {proxyStatus.running ? 'Running' : 'Off'}
@@ -193,15 +214,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Optional Simulate JIT Button for Testing */}
         <button
           onClick={onSimulateJit}
-          className="w-full flex items-center justify-between py-1.5 px-2 rounded text-[11px] text-zinc-400 hover:text-zinc-200 hover:bg-surface-hover transition-colors cursor-pointer"
+          className="w-full flex items-center justify-between py-1.5 px-2 rounded-md text-[11px] text-[#808080] hover:text-white hover:bg-surface-hover transition-colors cursor-pointer"
           title="Simulate an agent request intercept for testing"
         >
           <div className="flex items-center gap-1.5">
-            <Sparkles className="w-3 h-3 text-zinc-400" />
+            <Sparkles className="w-3 h-3 text-[#808080]" />
             <span>Test JIT Prompt</span>
           </div>
           {pendingJitCount > 0 && (
-            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300">
+            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-[#F2FF00]/20 text-burnrate-watch border border-[#F2FF00]/30">
               {pendingJitCount}
             </span>
           )}

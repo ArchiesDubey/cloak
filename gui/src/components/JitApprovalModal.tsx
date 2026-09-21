@@ -39,8 +39,8 @@ export const JitApprovalModal: React.FC<JitApprovalModalProps> = ({
   if (!request) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm select-none">
-      <div className="relative w-full max-w-md bg-surface rounded-xl border border-border-subtle shadow-modal overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md select-none">
+      <div className="relative w-full max-w-md bg-surface rounded-xl border border-border-track shadow-modal overflow-hidden animate-fade-in">
         {/* Modal Top Banner */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle">
           <div className="flex items-center gap-2.5">
@@ -49,21 +49,21 @@ export const JitApprovalModal: React.FC<JitApprovalModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-sm text-zinc-100">
+                <h3 className="font-semibold text-sm text-white">
                   Agent Credential Request
                 </h3>
-                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-800/60">
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#00FF88]/10 text-burnrate-ample border border-[#00FF88]/30 font-semibold">
                   Paused
                 </span>
               </div>
-              <p className="text-xs text-zinc-400">
+              <p className="text-xs text-[#808080]">
                 In-flight HTTP intercept via 127.0.0.1:4141
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-surface-hover transition-colors cursor-pointer"
+            className="p-1 rounded-md text-[#808080] hover:text-white hover:bg-surface-hover transition-colors cursor-pointer"
             title="Dismiss (Esc)"
           >
             <X className="w-4 h-4" />
@@ -75,19 +75,19 @@ export const JitApprovalModal: React.FC<JitApprovalModalProps> = ({
           <div className="p-3.5 rounded-lg bg-surface-active/60 border border-border-subtle space-y-2.5 text-xs">
             {/* Agent / Process Row */}
             <div className="flex items-center justify-between">
-              <span className="text-zinc-400 flex items-center gap-1.5">
-                <Bot className="w-3.5 h-3.5 text-zinc-500" />
+              <span className="text-[#808080] flex items-center gap-1.5">
+                <Bot className="w-3.5 h-3.5 text-[#6E6E73]" />
                 Requesting Agent
               </span>
-              <span className="font-mono text-zinc-200 font-medium">
+              <span className="font-mono text-white font-medium">
                 {request.agent} {request.processPid ? `(PID: ${request.processPid})` : ''}
               </span>
             </div>
 
             {/* Target Endpoint */}
             <div className="flex items-center justify-between">
-              <span className="text-zinc-400 flex items-center gap-1.5">
-                <Terminal className="w-3.5 h-3.5 text-zinc-500" />
+              <span className="text-[#808080] flex items-center gap-1.5">
+                <Terminal className="w-3.5 h-3.5 text-[#6E6E73]" />
                 Target Endpoint
               </span>
               <span className="text-zinc-300 font-mono text-[11px] truncate max-w-[220px]">
@@ -97,17 +97,17 @@ export const JitApprovalModal: React.FC<JitApprovalModalProps> = ({
 
             {/* Requested Credential */}
             <div className="flex items-center justify-between pt-2 border-t border-border-subtle">
-              <span className="text-zinc-300 font-medium flex items-center gap-1.5">
+              <span className="text-white font-medium flex items-center gap-1.5">
                 <KeyRound className="w-3.5 h-3.5 text-zinc-400" />
                 Requested Key
               </span>
-              <span className="text-white font-mono font-bold text-xs bg-surface px-2 py-0.5 rounded border border-border-subtle">
+              <span className="text-white font-mono font-bold text-xs bg-surface px-2 py-0.5 rounded border border-border-track shadow-sm">
                 {request.key}
               </span>
             </div>
           </div>
 
-          <p className="text-xs text-zinc-400 leading-relaxed">
+          <p className="text-xs text-[#808080] leading-relaxed">
             The agent initiated an outbound AI call missing credentials. Authorizing injects the key directly into process memory without session restart.
           </p>
 
@@ -116,25 +116,25 @@ export const JitApprovalModal: React.FC<JitApprovalModalProps> = ({
             {/* Deny Button */}
             <button
               onClick={() => onRespond(request.id, 'deny')}
-              className="flex flex-col items-center justify-center p-2.5 rounded-lg bg-surface hover:bg-rose-950/40 border border-border-subtle hover:border-rose-900/60 text-zinc-300 hover:text-rose-300 transition-colors cursor-pointer"
+              className="flex flex-col items-center justify-center p-2.5 rounded-lg bg-surface hover:bg-[#FF3F00]/10 border border-border-subtle hover:border-burnrate-critical/40 text-zinc-300 hover:text-burnrate-critical transition-all duration-150 ease-spring active:scale-[0.98] cursor-pointer"
             >
               <span className="text-xs font-semibold">Deny</span>
-              <span className="text-[10px] text-zinc-500 mt-0.5 font-mono">[D]</span>
+              <span className="text-[10px] text-[#6E6E73] mt-0.5 font-mono">[D]</span>
             </button>
 
             {/* Allow Once Button */}
             <button
               onClick={() => onRespond(request.id, 'once')}
-              className="flex flex-col items-center justify-center p-2.5 rounded-lg bg-surface hover:bg-surface-hover border border-border-subtle hover:border-zinc-700 text-zinc-200 transition-colors cursor-pointer"
+              className="flex flex-col items-center justify-center p-2.5 rounded-lg bg-surface hover:bg-surface-hover border border-border-subtle hover:border-border-track text-zinc-200 hover:text-white transition-all duration-150 ease-spring active:scale-[0.98] cursor-pointer"
             >
               <span className="text-xs font-semibold">Allow Once</span>
-              <span className="text-[10px] text-zinc-500 mt-0.5 font-mono">[O]</span>
+              <span className="text-[10px] text-[#6E6E73] mt-0.5 font-mono">[O]</span>
             </button>
 
             {/* Always Allow Button */}
             <button
               onClick={() => onRespond(request.id, 'always')}
-              className="flex flex-col items-center justify-center p-2.5 rounded-lg bg-white hover:bg-zinc-200 text-zinc-950 transition-colors cursor-pointer font-semibold shadow-sm"
+              className="flex flex-col items-center justify-center p-2.5 rounded-lg bg-white hover:bg-zinc-200 text-black transition-all duration-150 ease-spring active:scale-[0.98] cursor-pointer font-bold shadow-sm"
             >
               <span className="text-xs font-bold">Always Allow</span>
               <span className="text-[10px] text-zinc-600 mt-0.5 font-mono">[A]</span>
@@ -143,9 +143,9 @@ export const JitApprovalModal: React.FC<JitApprovalModalProps> = ({
         </div>
 
         {/* Footer info */}
-        <div className="px-5 py-2.5 bg-surface-active/40 border-t border-border-subtle flex items-center justify-between text-[11px] text-zinc-500">
+        <div className="px-5 py-2.5 bg-surface-active/40 border-t border-border-subtle flex items-center justify-between text-[11px] text-[#6E6E73]">
           <span>Shortcuts: [D] Deny • [O] Once • [A] Always</span>
-          <span className="text-emerald-400 font-medium">Verified</span>
+          <span className="text-burnrate-ample font-semibold">Verified</span>
         </div>
       </div>
     </div>

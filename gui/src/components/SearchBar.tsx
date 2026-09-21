@@ -43,7 +43,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 select-none">
       {/* Search Input Box */}
       <div className="relative flex-1 max-w-md flex items-center">
-        <div className="absolute left-3 flex items-center pointer-events-none text-zinc-500">
+        <div className="absolute left-3 flex items-center pointer-events-none text-[#808080]">
           <Search className="w-4 h-4" />
         </div>
         <input
@@ -52,7 +52,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Search secrets by name or prefix... (⌘K)"
-          className="w-full pl-9 pr-16 py-1.5 bg-surface hover:bg-surface-hover text-zinc-100 placeholder-zinc-500 text-xs font-mono rounded-lg border border-border-subtle focus:border-zinc-500 focus:outline-none transition-colors"
+          className="w-full pl-9 pr-16 py-1.5 bg-surface hover:bg-surface-hover text-white placeholder-[#6E6E73] text-xs font-mono rounded-lg border border-border-subtle focus:border-[#00FF88]/50 focus:ring-1 focus:ring-[#00FF88]/20 focus:outline-none transition-all duration-150 ease-spring"
         />
 
         {/* Action icons / shortcut hint */}
@@ -60,31 +60,31 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           {searchQuery ? (
             <button
               onClick={() => onSearchChange('')}
-              className="p-1 text-zinc-400 hover:text-zinc-200 rounded cursor-pointer"
+              className="p-1 text-[#808080] hover:text-white rounded cursor-pointer transition-colors"
               title="Clear search (Esc)"
             >
               <X className="w-3 h-3" />
             </button>
           ) : (
-            <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono text-zinc-500 bg-surface-active rounded border border-border-subtle">
+            <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono text-[#6E6E73] bg-surface-active rounded border border-border-subtle">
               ⌘K
             </kbd>
           )}
         </div>
       </div>
 
-      {/* Filter Category Segment Pills */}
-      <div className="flex items-center gap-1 overflow-x-auto text-xs no-scrollbar">
+      {/* Burnrate Segmented Control */}
+      <div className="flex items-center gap-1 p-0.5 bg-surface rounded-lg border border-border-subtle text-xs no-scrollbar">
         {categories.map((cat) => {
           const isActive = activeCategory === cat.id;
           return (
             <button
               key={cat.id}
               onClick={() => onCategoryChange(cat.id)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all duration-150 ease-spring whitespace-nowrap cursor-pointer ${
                 isActive
-                  ? 'bg-zinc-800 text-white border border-zinc-700'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-surface-hover'
+                  ? 'bg-surface-active text-white border border-border-track shadow-sm'
+                  : 'text-[#808080] hover:text-white'
               }`}
             >
               {cat.label}

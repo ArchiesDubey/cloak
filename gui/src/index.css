@@ -4,12 +4,12 @@
 
 @layer base {
   * {
-    border-color: rgba(255, 255, 255, 0.08);
+    border-color: #222328;
   }
 
   body {
-    background-color: #0A0B0D;
-    color: #EDEDED;
+    background-color: #000000;
+    color: #FFFFFF;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     user-select: none;
     -webkit-user-select: none;
@@ -22,10 +22,36 @@
   }
 }
 
-/* Custom minimal scrollbar */
+/* Burnrate Hairline & Spring Utilities */
+.hairline {
+  border-width: 1px;
+  border-color: #222328;
+}
+
+.hairline-track {
+  border-color: #2D2D2D;
+}
+
+/* Staggered Row Animation */
+@keyframes rowFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-stagger {
+  animation: rowFadeIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Custom Minimal macOS Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -33,10 +59,10 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: #303030;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: #454545;
 }

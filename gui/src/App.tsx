@@ -262,7 +262,7 @@ export const App: React.FC = () => {
 
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-white hover:bg-zinc-200 text-zinc-950 font-semibold text-xs transition-colors cursor-pointer flex-shrink-0 shadow-sm"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-white hover:bg-zinc-200 text-black font-semibold text-xs transition-all duration-150 ease-spring active:scale-[0.98] cursor-pointer flex-shrink-0 shadow-sm"
             title="Store new secret in hardware vault (⌘N)"
           >
             <Plus className="w-4 h-4" />
@@ -273,10 +273,10 @@ export const App: React.FC = () => {
         {/* Vault Title and Details */}
         <div className="px-6 pt-4 pb-2 flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-zinc-100 tracking-tight">
+            <h2 className="text-sm font-semibold text-white tracking-tight">
               {activeVaultTitle}
             </h2>
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-[#808080]">
               {filteredSecrets.length} {filteredSecrets.length === 1 ? 'secret' : 'secrets'} stored
             </p>
           </div>
