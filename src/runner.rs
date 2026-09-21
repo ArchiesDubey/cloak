@@ -1,7 +1,7 @@
 //! Child process execution and in-memory environment variable injection.
 
-use crate::storage::SecretStore;
 use anyhow::{Context, Result};
+use std::collections::HashMap;
 use std::process::{Command, Stdio};
 
 /// Executes a target command with secrets injected into the child process environment.
@@ -11,13 +11,10 @@ use std::process::{Command, Stdio};
 /// 2. Secrets are NEVER passed as command-line arguments (preventing visibility in `ps aux`, `pgrep`, `/proc`).
 /// 3. Parent shell environment remains unmodified.
 pub fn run_with_secrets(
-    store: &dyn SecretStore,
-    namespace: &str,
+    secrets: &HashMap<String, String>,
     cmd_name: &str,
     cmd_args: &[String],
 ) -> Result<i32> {
-    let secrets = store.get_all(namespace)?;
-
     let mut cmd = Command::new(cmd_name);
     cmd.args(cmd_args);
     cmd.stdin(Stdio::inherit());

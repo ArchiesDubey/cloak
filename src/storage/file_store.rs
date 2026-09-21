@@ -152,6 +152,13 @@ impl SecretStore for FileStore {
         }
     }
 
+    fn list_namespaces(&self) -> Result<Vec<String>> {
+        let data = self.load_data()?;
+        let mut namespaces: Vec<String> = data.namespaces.keys().cloned().collect();
+        namespaces.sort();
+        Ok(namespaces)
+    }
+
     fn delete(&self, namespace: &str, key: &str) -> Result<()> {
         let mut data = self.load_data()?;
         if let Some(ns) = data.namespaces.get_mut(namespace) {

@@ -20,6 +20,9 @@ pub trait SecretStore: Send + Sync {
     /// Deletes a secret for a given key under the specified namespace.
     fn delete(&self, namespace: &str, key: &str) -> Result<()>;
 
+    /// Lists all known namespaces.
+    fn list_namespaces(&self) -> Result<Vec<String>>;
+
     /// Retrieves all key-value secrets under the specified namespace.
     fn get_all(&self, namespace: &str) -> Result<HashMap<String, String>> {
         let keys = self.list(namespace)?;
@@ -30,5 +33,18 @@ pub trait SecretStore: Send + Sync {
             }
         }
         Ok(map)
+    }
+
+    /// Merges global secrets with project-level secrets.
+    /// Project secrets take precedence over global secrets on key collisions.
+    fn get_merged(&self, global_ns: &str, project_ns: Option<&str>) -> Result<HashMap<String, String>> {
+        let mut merged = self.get_all(global_ns)?;
+        if let Some(p_ns) = project_ns {
+            let project_secrets = self.get_all(p_ns)?;
+            for (k, v) in project_secrets {
+                merged.insert(k, v);
+            }
+        }
+        Ok(merged)
     }
 }

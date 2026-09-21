@@ -105,6 +105,13 @@ impl SecretStore for KeyringStore {
         }
     }
 
+    fn list_namespaces(&self) -> Result<Vec<String>> {
+        let meta = self.load_metadata();
+        let mut namespaces: Vec<String> = meta.namespaces.keys().cloned().collect();
+        namespaces.sort();
+        Ok(namespaces)
+    }
+
     fn delete(&self, namespace: &str, key: &str) -> Result<()> {
         let service = Self::service_name(namespace);
         let entry = Entry::new(&service, key)
