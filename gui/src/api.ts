@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { SecretItem, ProxyStatus, SecurityStatus, JitRequest, SecretScope } from './types';
 import { INITIAL_SECRETS, INITIAL_PROXY_STATUS, INITIAL_SECURITY_STATUS, INITIAL_PENDING_JIT } from './mockData';
 
@@ -18,11 +19,15 @@ const isTauri = (): boolean =>
   typeof window !== 'undefined' && (!!window.__TAURI_INTERNALS__ || !!window.__TAURI__);
 
 async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  if (window.__TAURI__?.core?.invoke) {
-    return await window.__TAURI__.core.invoke<T>(cmd, args);
-  }
-  if (window.__TAURI__?.invoke) {
-    return await window.__TAURI__.invoke<T>(cmd, args);
+  if (isTauri()) {
+    try {
+      return await invoke<T>(cmd, args);
+    } catch (err) {
+      if (window.__TAURI__?.core?.invoke) {
+        return await window.__TAURI__.core.invoke<T>(cmd, args);
+      }
+      throw err;
+    }
   }
   throw new Error('Tauri invoke IPC is not available');
 }
@@ -188,7 +193,8 @@ export const api = {
         mockSecurityStatus.isUnlocked = success;
         return success;
       } catch (err) {
-        console.warn('Tauri invoke failed, falling back to mock biometrics', err);
+        console.error('[Cloak] authenticate_vault error:', err);
+        return false;
       }
     }
 
