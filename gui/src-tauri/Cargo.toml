@@ -13,3 +13,4 @@ cloak = { path = "../.." }
 
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }
+cc = "1.0"

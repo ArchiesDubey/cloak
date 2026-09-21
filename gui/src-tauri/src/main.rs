@@ -8,6 +8,10 @@ use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::State;
 
+extern "C" {
+    fn cloak_authenticate_biometrics(reason_str: *const std::os::raw::c_char) -> std::os::raw::c_int;
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SecretItemDto {
     pub id: String,
@@ -25,8 +29,16 @@ pub struct ProxyStatusDto {
     pub anthropic_configured: bool,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct SecurityStatusDto {
+    pub is_unlocked: bool,
+    pub hardware_backend: String,
+    pub biometric_type: String,
+}
+
 pub struct AppState {
     pub store: Mutex<KeyringStore>,
+    pub is_unlocked: Mutex<bool>,
 }
 
 fn mask_val(val: &str) -> String {
@@ -41,6 +53,11 @@ fn mask_val(val: &str) -> String {
 
 #[tauri::command]
 fn list_secrets(state: State<AppState>) -> Result<Vec<SecretItemDto>, String> {
+    let unlocked = *state.is_unlocked.lock().map_err(|e| e.to_string())?;
+    if !unlocked {
+        return Ok(Vec::new());
+    }
+
     let store = state.store.lock().map_err(|e| e.to_string())?;
     let namespaces = store.list_namespaces().map_err(|e| e.to_string())?;
 
@@ -78,6 +95,11 @@ fn list_secrets(state: State<AppState>) -> Result<Vec<SecretItemDto>, String> {
 
 #[tauri::command]
 fn reveal_secret(state: State<AppState>, scope: String, key: String) -> Result<String, String> {
+    let unlocked = *state.is_unlocked.lock().map_err(|e| e.to_string())?;
+    if !unlocked {
+        return Err("Hardware Vault is locked. Authenticate with Touch ID to access.".to_string());
+    }
+
     let store = state.store.lock().map_err(|e| e.to_string())?;
     let ns = if scope == "global" {
         "global".to_string()
@@ -94,6 +116,11 @@ fn reveal_secret(state: State<AppState>, scope: String, key: String) -> Result<S
 
 #[tauri::command]
 fn save_secret(state: State<AppState>, scope: String, key: String, value: String) -> Result<(), String> {
+    let unlocked = *state.is_unlocked.lock().map_err(|e| e.to_string())?;
+    if !unlocked {
+        return Err("Hardware Vault is locked. Authenticate with Touch ID to store secrets.".to_string());
+    }
+
     let store = state.store.lock().map_err(|e| e.to_string())?;
     let ns = if scope == "global" {
         "global".to_string()
@@ -106,6 +133,11 @@ fn save_secret(state: State<AppState>, scope: String, key: String, value: String
 
 #[tauri::command]
 fn delete_secret(state: State<AppState>, scope: String, key: String) -> Result<(), String> {
+    let unlocked = *state.is_unlocked.lock().map_err(|e| e.to_string())?;
+    if !unlocked {
+        return Err("Hardware Vault is locked. Authenticate with Touch ID to delete secrets.".to_string());
+    }
+
     let store = state.store.lock().map_err(|e| e.to_string())?;
     let ns = if scope == "global" {
         "global".to_string()
@@ -114,6 +146,41 @@ fn delete_secret(state: State<AppState>, scope: String, key: String) -> Result<(
     };
 
     store.delete(&ns, &key).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn authenticate_vault(state: State<'_, AppState>) -> Result<bool, String> {
+    let success = tokio::task::spawn_blocking(|| {
+        let reason = std::ffi::CString::new("Unlock Cloak Hardware Vault").unwrap();
+        let res = unsafe { cloak_authenticate_biometrics(reason.as_ptr()) };
+        res == 1
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    if success {
+        let mut unlocked = state.is_unlocked.lock().map_err(|e| e.to_string())?;
+        *unlocked = true;
+    }
+
+    Ok(success)
+}
+
+#[tauri::command]
+fn lock_vault(state: State<'_, AppState>) -> Result<bool, String> {
+    let mut unlocked = state.is_unlocked.lock().map_err(|e| e.to_string())?;
+    *unlocked = false;
+    Ok(false)
+}
+
+#[tauri::command]
+fn get_security_status(state: State<'_, AppState>) -> Result<SecurityStatusDto, String> {
+    let unlocked = *state.is_unlocked.lock().map_err(|e| e.to_string())?;
+    Ok(SecurityStatusDto {
+        is_unlocked: unlocked,
+        hardware_backend: "macOS Keychain & Secure Enclave".to_string(),
+        biometric_type: "Touch ID / Device Passcode".to_string(),
+    })
 }
 
 #[tauri::command]
@@ -166,6 +233,7 @@ fn main() {
     tauri::Builder::default()
         .manage(AppState {
             store: Mutex::new(store),
+            is_unlocked: Mutex::new(true),
         })
         .invoke_handler(tauri::generate_handler![
             list_secrets,
@@ -174,6 +242,9 @@ fn main() {
             delete_secret,
             check_proxy_status,
             toggle_window_mode,
+            authenticate_vault,
+            lock_vault,
+            get_security_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running cloak desktop application");

@@ -161,7 +161,17 @@ export const api = {
   async getSecurityStatus(): Promise<SecurityStatus> {
     if (isTauri()) {
       try {
-        return await tauriInvoke<SecurityStatus>('get_security_status');
+        const res = await tauriInvoke<{
+          is_unlocked: boolean;
+          hardware_backend: string;
+          biometric_type: string;
+        }>('get_security_status');
+        return {
+          ...mockSecurityStatus,
+          isUnlocked: res.is_unlocked,
+          hardwareBackend: 'Apple Keychain (Secure Enclave)',
+          biometricType: 'Touch ID',
+        };
       } catch (err) {
         console.warn('Tauri invoke failed, falling back to mock storage', err);
       }
@@ -171,21 +181,44 @@ export const api = {
     return { ...mockSecurityStatus };
   },
 
-  async toggleVaultLock(): Promise<boolean> {
+  async authenticateVault(): Promise<boolean> {
     if (isTauri()) {
       try {
-        return await tauriInvoke<boolean>('toggle_vault_lock');
+        const success = await tauriInvoke<boolean>('authenticate_vault');
+        mockSecurityStatus.isUnlocked = success;
+        return success;
       } catch (err) {
-        console.warn('Tauri invoke failed, falling back to mock storage', err);
+        console.warn('Tauri invoke failed, falling back to mock biometrics', err);
       }
     }
 
-    await delay(180);
-    mockSecurityStatus = {
-      ...mockSecurityStatus,
-      isUnlocked: !mockSecurityStatus.isUnlocked,
-    };
-    return mockSecurityStatus.isUnlocked;
+    await delay(250);
+    mockSecurityStatus.isUnlocked = true;
+    return true;
+  },
+
+  async lockVault(): Promise<boolean> {
+    if (isTauri()) {
+      try {
+        await tauriInvoke<boolean>('lock_vault');
+        mockSecurityStatus.isUnlocked = false;
+        return false;
+      } catch (err) {
+        console.warn('Tauri invoke failed, falling back to mock lock', err);
+      }
+    }
+
+    await delay(80);
+    mockSecurityStatus.isUnlocked = false;
+    return false;
+  },
+
+  async toggleVaultLock(): Promise<boolean> {
+    if (mockSecurityStatus.isUnlocked) {
+      return this.lockVault();
+    } else {
+      return this.authenticateVault();
+    }
   },
 
   async getPendingJitRequest(): Promise<JitRequest | null> {

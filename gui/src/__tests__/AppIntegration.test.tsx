@@ -85,4 +85,33 @@ describe('App Integration Tests: Cloak Minimal Desktop Vault', () => {
       expect(screen.queryByText('Agent Credential Request')).not.toBeInTheDocument();
     });
   });
+
+  it('locks the vault, shields secrets from view, and unlocks on biometric challenge', async () => {
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('OPENAI_API_KEY')).toBeInTheDocument();
+    });
+
+    // Click Hardware Enclave button to lock
+    const lockBtn = screen.getByTitle('Toggle Hardware Keystore lock');
+    fireEvent.click(lockBtn);
+
+    // Vault should be locked: secrets hidden, locked screen visible
+    await waitFor(() => {
+      expect(screen.getByText('Hardware Vault Locked')).toBeInTheDocument();
+      expect(screen.queryByText('OPENAI_API_KEY')).not.toBeInTheDocument();
+      expect(screen.getByText('Unlock with Touch ID')).toBeInTheDocument();
+    });
+
+    // Click Unlock with Touch ID
+    const unlockBtn = screen.getByText('Unlock with Touch ID');
+    fireEvent.click(unlockBtn);
+
+    // Vault should restore secrets
+    await waitFor(() => {
+      expect(screen.getByText('OPENAI_API_KEY')).toBeInTheDocument();
+      expect(screen.queryByText('Hardware Vault Locked')).not.toBeInTheDocument();
+    });
+  });
 });

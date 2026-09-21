@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Lock, Fingerprint } from 'lucide-react';
 import { SecretItem, ScopeFilter, ProxyStatus, SecurityStatus, JitRequest, SecretScope } from './types';
 import { api } from './api';
 import { Sidebar } from './components/Sidebar';
@@ -118,10 +118,32 @@ export const App: React.FC = () => {
     showToast(`Proxy ${next.running ? 'enabled on port 4141' : 'stopped'}`);
   };
 
+  const [authenticating, setAuthenticating] = useState(false);
+
   const handleToggleLock = async () => {
-    const unlocked = await api.toggleVaultLock();
-    setSecurityStatus((prev) => ({ ...prev, isUnlocked: unlocked }));
-    showToast(unlocked ? 'Hardware vault unlocked with Touch ID' : 'Hardware vault locked');
+    if (securityStatus.isUnlocked) {
+      await api.lockVault();
+      setSecurityStatus((prev) => ({ ...prev, isUnlocked: false }));
+      setSecrets([]);
+      showToast('Hardware vault locked');
+    } else {
+      setAuthenticating(true);
+      try {
+        const unlocked = await api.authenticateVault();
+        if (unlocked) {
+          setSecurityStatus((prev) => ({ ...prev, isUnlocked: true }));
+          const items = await api.listSecrets();
+          setSecrets(items);
+          showToast('Hardware vault unlocked with Touch ID');
+        } else {
+          showToast('Authentication cancelled or failed');
+        }
+      } catch (err) {
+        showToast('Authentication error');
+      } finally {
+        setAuthenticating(false);
+      }
+    }
   };
 
   const handleRespondJit = async (requestId: string, action: 'deny' | 'once' | 'always') => {
@@ -283,8 +305,28 @@ export const App: React.FC = () => {
         </div>
 
         {/* Secrets List Container */}
-        <div className="flex-1 overflow-y-auto px-6 py-3">
-          {loading ? (
+        <div className="flex-1 overflow-y-auto px-6 py-3 flex flex-col">
+          {!securityStatus.isUnlocked ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center select-none animate-fadeIn">
+              <div className="w-14 h-14 rounded-2xl bg-surface border border-border-subtle flex items-center justify-center mb-4 shadow-xl">
+                <Lock className="w-6 h-6 text-burnrate-critical" />
+              </div>
+              <h2 className="text-sm font-semibold tracking-tight text-white mb-1.5">
+                Hardware Vault Locked
+              </h2>
+              <p className="text-xs text-[#808080] max-w-xs mb-5 leading-relaxed">
+                Credentials in macOS Keychain &amp; Secure Enclave are encrypted. Biometric authentication is required to access credentials.
+              </p>
+              <button
+                onClick={handleToggleLock}
+                disabled={authenticating}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-burnrate-ample hover:bg-burnrate-ample/90 text-black font-semibold text-xs transition-all duration-150 ease-spring active:scale-95 shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                <Fingerprint className="w-4 h-4" />
+                {authenticating ? 'Verifying Touch ID...' : 'Unlock with Touch ID'}
+              </button>
+            </div>
+          ) : loading ? (
             <div className="flex items-center justify-center p-12 text-zinc-500 font-mono text-xs">
               Loading secure vault...
             </div>
