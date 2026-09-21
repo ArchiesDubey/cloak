@@ -41,16 +41,6 @@ pub struct AppState {
     pub is_unlocked: Mutex<bool>,
 }
 
-fn mask_val(val: &str) -> String {
-    if val.len() <= 8 {
-        "••••••••".to_string()
-    } else {
-        let start = &val[..4];
-        let end = &val[val.len() - 4..];
-        format!("{}••••••••{}", start, end)
-    }
-}
-
 #[tauri::command]
 fn list_secrets(state: State<AppState>) -> Result<Vec<SecretItemDto>, String> {
     let unlocked = *state.is_unlocked.lock().map_err(|e| e.to_string())?;
@@ -66,11 +56,7 @@ fn list_secrets(state: State<AppState>) -> Result<Vec<SecretItemDto>, String> {
     for ns in namespaces {
         let keys = store.list(&ns).map_err(|e| e.to_string())?;
         for key in keys {
-            let masked = if let Ok(Some(val)) = store.get(&ns, &key) {
-                mask_val(&val)
-            } else {
-                "••••••••".to_string()
-            };
+            let masked = "••••••••••••••••".to_string();
 
             let scope_label = if ns == "global" {
                 "global".to_string()

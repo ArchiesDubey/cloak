@@ -47,7 +47,29 @@ export const api = {
   async listSecrets(scope?: string): Promise<SecretItem[]> {
     if (isTauri()) {
       try {
-        return await tauriInvoke<SecretItem[]>('list_secrets', { scope });
+        const dtos = await tauriInvoke<
+          Array<{
+            id: string;
+            key: string;
+            masked_value: string;
+            scope: string;
+            updated_at: string;
+          }>
+        >('list_secrets');
+
+        return dtos.map((d) => ({
+          key: d.key,
+          maskedValue: d.masked_value,
+          scope: (d.scope === 'global' ? 'global' : 'project') as SecretScope,
+          project: d.scope !== 'global' ? d.scope : undefined,
+          updatedAt: d.updated_at,
+          category: d.key.toLowerCase().includes('db') || d.key.toLowerCase().includes('database')
+            ? 'database'
+            : d.key.toLowerCase().includes('token')
+            ? 'token'
+            : 'api-key',
+          hardwareStored: true,
+        }));
       } catch (err) {
         console.warn('Tauri invoke failed, falling back to mock storage', err);
       }
@@ -60,12 +82,12 @@ export const api = {
     return mockSecrets.filter((s) => s.scope === scope);
   },
 
-  async getSecret(key: string, reveal: boolean): Promise<string> {
+  async getSecret(key: string, reveal: boolean, scope: string = 'global'): Promise<string> {
     if (isTauri()) {
       try {
-        return await tauriInvoke<string>('get_secret', { key, reveal });
+        return await tauriInvoke<string>('reveal_secret', { scope, key });
       } catch (err) {
-        console.warn('Tauri invoke failed, falling back to mock storage', err);
+        console.warn('Tauri invoke reveal_secret failed, falling back to mock storage', err);
       }
     }
 
@@ -81,11 +103,12 @@ export const api = {
     scope: SecretScope = 'global',
     project?: string
   ): Promise<SecretItem> {
+    const scopeParam = scope === 'global' ? 'global' : (project || 'cloak-core');
     if (isTauri()) {
       try {
-        return await tauriInvoke<SecretItem>('set_secret', { key, value, scope, project });
+        await tauriInvoke<void>('save_secret', { scope: scopeParam, key, value });
       } catch (err) {
-        console.warn('Tauri invoke failed, falling back to mock storage', err);
+        console.warn('Tauri invoke save_secret failed, falling back to mock storage', err);
       }
     }
 
@@ -119,12 +142,13 @@ export const api = {
     return newSecret;
   },
 
-  async deleteSecret(key: string): Promise<boolean> {
+  async deleteSecret(key: string, scope: string = 'global'): Promise<boolean> {
     if (isTauri()) {
       try {
-        return await tauriInvoke<boolean>('delete_secret', { key });
+        await tauriInvoke<void>('delete_secret', { scope, key });
+        return true;
       } catch (err) {
-        console.warn('Tauri invoke failed, falling back to mock storage', err);
+        console.warn('Tauri invoke delete_secret failed, falling back to mock storage', err);
       }
     }
 
@@ -136,9 +160,19 @@ export const api = {
   async getProxyStatus(): Promise<ProxyStatus> {
     if (isTauri()) {
       try {
-        return await tauriInvoke<ProxyStatus>('get_proxy_status');
+        const dto = await tauriInvoke<{
+          active: boolean;
+          port: number;
+          openai_configured: boolean;
+          anthropic_configured: boolean;
+        }>('check_proxy_status');
+        return {
+          running: dto.active,
+          port: dto.port,
+          interceptCount: mockProxyStatus.interceptCount,
+        };
       } catch (err) {
-        console.warn('Tauri invoke failed, falling back to mock storage', err);
+        console.warn('Tauri invoke check_proxy_status failed, falling back to mock storage', err);
       }
     }
 
