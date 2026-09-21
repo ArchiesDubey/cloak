@@ -113,6 +113,8 @@ enum Commands {
         #[arg(long, default_value_t = 4141)]
         port: u16,
     },
+    /// Launch the Cloak Desktop GUI (Hybrid HUD)
+    Gui,
 }
 
 fn get_store(backend: StoreBackend, custom_vault: Option<PathBuf>) -> Result<Box<dyn SecretStore>> {
@@ -374,6 +376,26 @@ async fn main() -> Result<()> {
         Commands::Proxy { port } => {
             let ns = scope_to_namespace(&target_scope);
             proxy::start_proxy(store, ns, port).await?;
+        }
+
+        Commands::Gui => {
+            println!("🚀 Launching Cloak Hybrid HUD desktop app...");
+            let status = std::process::Command::new("cloak-gui")
+                .spawn()
+                .or_else(|_| {
+                    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+                    let path = format!("{}/.cargo/bin/cloak-gui", home);
+                    std::process::Command::new(path).spawn()
+                });
+
+            match status {
+                Ok(_) => {
+                    println!("✓ Cloak HUD is running.");
+                }
+                Err(e) => {
+                    eprintln!("Failed to launch cloak-gui: {e}. Try running 'cloak-gui' directly.");
+                }
+            }
         }
     }
 
