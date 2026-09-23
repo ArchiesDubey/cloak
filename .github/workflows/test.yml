@@ -3,8 +3,18 @@ name: Test & CI
 on:
   push:
     branches: [ "main", "master" ]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - 'videos/**'
+      - '.gitignore'
   pull_request:
     branches: [ "main", "master" ]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - 'videos/**'
+      - '.gitignore'
 
 jobs:
   full-verification:

@@ -27,10 +27,10 @@ Pre-built releases for macOS and Windows are available on [GitHub Releases](http
 
 | Platform | Package | Architecture | Direct Download |
 | :--- | :--- | :--- | :--- |
-| **macOS** | Disk Image (`.dmg`) | Apple Silicon (M1/M2/M3/M4) | [**`Cloak_aarch64.dmg`**](https://github.com/ArchiesDubey/cloak/releases/latest/download/Cloak_aarch64.dmg) |
-| **macOS** | Disk Image (`.dmg`) | Intel (x86_64) | [**`Cloak_x64.dmg`**](https://github.com/ArchiesDubey/cloak/releases/latest/download/Cloak_x64.dmg) |
-| **Windows** | Windows Installer (`.msi`) | 64-bit (x86_64) | [**`Cloak_x64_en-US.msi`**](https://github.com/ArchiesDubey/cloak/releases/latest/download/Cloak_x64_en-US.msi) |
-| **Windows** | Setup Executable (`.exe`) | 64-bit (NSIS) | [**`Cloak_x64-setup.exe`**](https://github.com/ArchiesDubey/cloak/releases/latest/download/Cloak_x64-setup.exe) |
+| **macOS** | Disk Image (`.dmg`) | Apple Silicon (M1/M2/M3/M4) | [**`Cloak_0.6.0_aarch64.dmg`**](https://github.com/ArchiesDubey/cloak/releases/download/v0.6.0/Cloak_0.6.0_aarch64.dmg) |
+| **macOS** | Disk Image (`.dmg`) | Intel (x86_64) | [**`Cloak_0.6.0_x64.dmg`**](https://github.com/ArchiesDubey/cloak/releases/download/v0.6.0/Cloak_0.6.0_x64.dmg) |
+| **Windows** | Windows Installer (`.msi`) | 64-bit (x86_64) | [**`Cloak_0.6.0_x64_en-US.msi`**](https://github.com/ArchiesDubey/cloak/releases/download/v0.6.0/Cloak_0.6.0_x64_en-US.msi) |
+| **Windows** | Setup Executable (`.exe`) | 64-bit (NSIS) | [**`Cloak_0.6.0_x64-setup.exe`**](https://github.com/ArchiesDubey/cloak/releases/download/v0.6.0/Cloak_0.6.0_x64-setup.exe) |
 
 > **In-App Auto Updates**: Cloak includes built-in auto-updates. Once installed, future updates can be checked and applied directly in the app without losing any credentials or settings.
 >
