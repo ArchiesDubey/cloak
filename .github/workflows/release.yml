@@ -29,6 +29,13 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            gui/src-tauri -> gui/src-tauri/target
+
       - name: Run Cargo Library Tests
         run: cargo test --lib
 
@@ -65,7 +72,7 @@ jobs:
           - platform: "macos-latest"
             target: "aarch64-apple-darwin"
             args: "--target aarch64-apple-darwin"
-          - platform: "macos-13"
+          - platform: "macos-latest"
             target: "x86_64-apple-darwin"
             args: "--target x86_64-apple-darwin"
           - platform: "windows-latest"
@@ -93,6 +100,13 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            gui/src-tauri -> gui/src-tauri/target
 
       - name: Install frontend dependencies
         working-directory: ./gui

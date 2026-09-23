@@ -29,6 +29,13 @@ jobs:
         with:
           components: clippy, rustfmt
 
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            gui/src-tauri -> gui/src-tauri/target
+
       - name: Setup Node.js & pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -90,6 +97,9 @@ jobs:
 
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
 
       - name: Install Linux Build Dependencies
         if: matrix.os == 'ubuntu-latest'
