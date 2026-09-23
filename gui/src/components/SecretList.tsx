@@ -5,8 +5,8 @@ import { SecretCard } from './SecretCard';
 
 interface SecretListProps {
   secrets: SecretItem[];
-  onRevealToggle: (key: string, currentRevealed: boolean) => Promise<string | void>;
-  onDelete: (key: string) => Promise<void>;
+  onRevealToggle: (secret: SecretItem, currentRevealed: boolean) => Promise<string | void>;
+  onDelete: (secret: SecretItem) => Promise<void>;
   onAddSecretClick: () => void;
   onCopySuccess: (key: string) => void;
   searchQuery?: string;

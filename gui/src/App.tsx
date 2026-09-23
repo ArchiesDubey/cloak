@@ -23,8 +23,8 @@ export const App: React.FC = () => {
   });
 
   const [securityStatus, setSecurityStatus] = useState<SecurityStatus>({
-    hardwareBackend: 'Apple Keychain (Secure Enclave)',
-    isUnlocked: true,
+    hardwareBackend: 'macOS Keychain (OS Keyring)',
+    isUnlocked: false,
     biometricType: 'Touch ID',
     memoryLockActive: true,
     coreDumpsDisabled: true,
@@ -32,7 +32,9 @@ export const App: React.FC = () => {
 
   const [pendingJit, setPendingJit] = useState<JitRequest | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isUnlockPromptOpen, setIsUnlockPromptOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [authenticating, setAuthenticating] = useState(false);
 
   // Load initial secrets & statuses
   const refreshData = useCallback(async () => {
@@ -59,66 +61,115 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     refreshData();
+    const interval = setInterval(async () => {
+      // Pause polling if document is hidden to conserve energy and reduce CPU usage (A6 fix)
+      if (document.hidden) return;
+
+      const p = await api.getProxyStatus();
+      setProxyStatus(p);
+
+      // Check for pending JIT requests if proxy is running
+      if (p.running) {
+        try {
+          const pending = await api.getPendingJitRequest();
+          if (pending) {
+            setPendingJit(pending);
+          }
+        } catch {
+          // ignore JIT poll errors
+        }
+      }
+    }, 2000);
+    return () => clearInterval(interval);
   }, [refreshData]);
+
+  const handleNewSecretClick = useCallback(() => {
+    if (!securityStatus.isUnlocked) {
+      setIsUnlockPromptOpen(true);
+    } else {
+      setIsAddModalOpen(true);
+    }
+  }, [securityStatus.isUnlocked]);
 
   // Global Keyboard Shortcuts (⌘N for new)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'n') {
         e.preventDefault();
-        setIsAddModalOpen(true);
+        handleNewSecretClick();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [handleNewSecretClick]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Handlers
-  const handleRevealToggle = async (key: string, currentRevealed: boolean): Promise<string | void> => {
+  // Handlers (N6 fix: pass secret scope to reveal & delete)
+  const handleRevealToggle = async (secret: SecretItem, currentRevealed: boolean): Promise<string | void> => {
     if (!currentRevealed) {
-      const full = await api.getSecret(key, true);
-      return full;
+      try {
+        const scopeParam = secret.scope === 'global' ? 'global' : (secret.project || 'global');
+        const full = await api.getSecret(secret.key, true, scopeParam);
+        return full;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        showToast(`Reveal failed: ${message}`);
+      }
     }
   };
 
-  const handleDeleteSecret = async (key: string) => {
-    await api.deleteSecret(key);
-    setSecrets((prev) => prev.filter((s) => s.key !== key));
-    showToast(`Deleted ${key} from hardware store`);
+  const handleDeleteSecret = async (secret: SecretItem) => {
+    try {
+      const scopeParam = secret.scope === 'global' ? 'global' : (secret.project || 'global');
+      await api.deleteSecret(secret.key, scopeParam);
+      setSecrets((prev) => prev.filter((s) => s.key !== secret.key || s.project !== secret.project));
+      showToast(`Deleted ${secret.key} from ${scopeParam} store`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      showToast(`Delete failed: ${message}`);
+    }
   };
 
   const handleSaveSecret = async (
     key: string,
     value: string,
     scope: SecretScope,
-    project?: string
+    project?: string,
+    hardwareProtected?: boolean
   ) => {
-    const created = await api.setSecret(key, value, scope, project);
-    setSecrets((prev) => {
-      const existing = prev.findIndex((s) => s.key === key);
-      if (existing >= 0) {
-        const copy = [...prev];
-        copy[existing] = created;
-        return copy;
-      }
-      return [created, ...prev];
-    });
-    showToast(`Secured ${key} in hardware enclave`);
+    try {
+      const created = await api.setSecret(key, value, scope, project, hardwareProtected);
+      setSecrets((prev) => {
+        const existing = prev.findIndex((s) => s.key === key);
+        if (existing >= 0) {
+          const copy = [...prev];
+          copy[existing] = created;
+          return copy;
+        }
+        return [created, ...prev];
+      });
+      showToast(`Secured ${key} in hardware store`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      showToast(`Save failed: ${message}`);
+    }
   };
 
   const handleToggleProxy = async () => {
-    const next = await api.toggleProxy();
-    setProxyStatus(next);
-    showToast(`Proxy ${next.running ? 'enabled on port 4141' : 'stopped'}`);
+    try {
+      const next = await api.toggleProxy();
+      setProxyStatus(next);
+      showToast(`Proxy ${next.running ? 'enabled on port 4141' : 'stopped'}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      showToast(`Proxy toggle failed: ${message}`);
+    }
   };
-
-  const [authenticating, setAuthenticating] = useState(false);
 
   const handleToggleLock = async () => {
     if (securityStatus.isUnlocked) {
@@ -146,8 +197,29 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleRespondJit = async (requestId: string, action: 'deny' | 'once' | 'always') => {
-    await api.respondJit(requestId, action);
+  const handleUnlockAndOpenNewSecret = async () => {
+    setAuthenticating(true);
+    try {
+      const unlocked = await api.authenticateVault();
+      if (unlocked) {
+        setSecurityStatus((prev) => ({ ...prev, isUnlocked: true }));
+        const items = await api.listSecrets();
+        setSecrets(items);
+        setIsUnlockPromptOpen(false);
+        setIsAddModalOpen(true);
+        showToast('Hardware vault unlocked. Ready to store secret.');
+      } else {
+        showToast('Authentication cancelled or failed');
+      }
+    } catch (err) {
+      showToast('Authentication error');
+    } finally {
+      setAuthenticating(false);
+    }
+  };
+
+  const handleRespondJit = async (requestId: string, action: 'deny' | 'once' | 'always', value?: string) => {
+    await api.respondJit(requestId, action, value);
     setPendingJit(null);
     const refreshedProxy = await api.getProxyStatus();
     setProxyStatus(refreshedProxy);
@@ -283,7 +355,7 @@ export const App: React.FC = () => {
           </div>
 
           <button
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={handleNewSecretClick}
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-white hover:bg-zinc-200 text-black font-semibold text-xs transition-all duration-150 ease-spring active:scale-[0.98] cursor-pointer flex-shrink-0 shadow-sm"
             title="Store new secret in hardware vault (⌘N)"
           >
@@ -315,7 +387,7 @@ export const App: React.FC = () => {
                 Hardware Vault Locked
               </h2>
               <p className="text-xs text-[#808080] max-w-xs mb-5 leading-relaxed">
-                Credentials in macOS Keychain &amp; Secure Enclave are encrypted. Biometric authentication is required to access credentials.
+                Credentials in macOS Keychain &amp; OS Keyring are encrypted. Biometric authentication is required to access credentials.
               </p>
               <button
                 onClick={handleToggleLock}
@@ -335,7 +407,7 @@ export const App: React.FC = () => {
               secrets={filteredSecrets}
               onRevealToggle={handleRevealToggle}
               onDelete={handleDeleteSecret}
-              onAddSecretClick={() => setIsAddModalOpen(true)}
+              onAddSecretClick={handleNewSecretClick}
               onCopySuccess={(key) => showToast(`Copied ${key} to clipboard`)}
               searchQuery={searchQuery}
             />
@@ -351,6 +423,41 @@ export const App: React.FC = () => {
         defaultScope={currentScope === 'project' ? 'project' : 'global'}
         currentProjectName={selectedProject || 'cloak-core'}
       />
+
+      {/* Vault Locked Dialog when trying to perform privileged action (e.g. New Secret) */}
+      {isUnlockPromptOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md select-none animate-fadeIn">
+          <div data-testid="unlock-prompt-modal" className="relative w-full max-w-sm bg-surface rounded-xl border border-border-track shadow-modal p-6 text-center animate-scaleIn">
+            <div className="w-12 h-12 rounded-xl bg-surface-active border border-border-subtle flex items-center justify-center mx-auto mb-4 text-burnrate-watch shadow-sm">
+              <Lock className="w-6 h-6 text-burnrate-watch" />
+            </div>
+            <h3 className="font-semibold text-base text-white mb-2">
+              Hardware Vault Locked
+            </h3>
+            <p className="text-xs text-[#808080] leading-relaxed mb-6">
+              Your vault is currently locked to protect stored credentials. Please authenticate with{' '}
+              <span className="text-zinc-200 font-medium">{securityStatus.biometricType || 'Touch ID'}</span> to unlock your vault and add new secrets.
+            </p>
+            <div className="flex flex-col gap-2.5">
+              <button
+                data-testid="unlock-and-add-btn"
+                onClick={handleUnlockAndOpenNewSecret}
+                disabled={authenticating}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-burnrate-ample hover:bg-burnrate-ample/90 text-black font-semibold text-xs transition-all duration-150 ease-spring active:scale-98 shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                <Fingerprint className="w-4 h-4" />
+                <span>{authenticating ? 'Verifying...' : `Unlock with ${securityStatus.biometricType || 'Touch ID'}`}</span>
+              </button>
+              <button
+                onClick={() => setIsUnlockPromptOpen(false)}
+                className="w-full py-2 px-4 rounded-lg bg-transparent hover:bg-surface-hover text-zinc-400 hover:text-white text-xs font-medium transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* JIT Security Approval Modal */}
       <JitApprovalModal

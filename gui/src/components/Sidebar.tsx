@@ -73,7 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="flex items-center gap-1.5">
                 <span className="font-semibold text-sm tracking-tight text-white">Cloak</span>
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface border border-border-subtle text-[#808080] font-mono">
-                  v0.1
+                  v0.5.1
                 </span>
               </div>
             </div>
@@ -171,7 +171,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
             <div className="flex flex-col">
               <span className="text-[11px] font-medium text-white">
-                {securityStatus.isUnlocked ? 'Hardware Enclave' : 'Vault Locked'}
+                {securityStatus.isUnlocked ? 'Keychain Vault' : 'Vault Locked'}
               </span>
               <span className="text-[10px] text-[#808080] font-mono">
                 {securityStatus.biometricType}

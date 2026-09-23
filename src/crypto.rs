@@ -43,10 +43,7 @@ pub fn generate_nonce() -> [u8; NONCE_LEN] {
 
 /// Encrypts plaintext bytes using XChaCha20-Poly1305 AEAD.
 /// Returns (nonce, ciphertext_with_tag).
-pub fn encrypt_bytes(
-    key: &[u8; KEY_LEN],
-    plaintext: &[u8],
-) -> Result<([u8; NONCE_LEN], Vec<u8>)> {
+pub fn encrypt_bytes(key: &[u8; KEY_LEN], plaintext: &[u8]) -> Result<([u8; NONCE_LEN], Vec<u8>)> {
     let cipher = XChaCha20Poly1305::new(Key::from_slice(key));
     let nonce_bytes = generate_nonce();
     let nonce = XNonce::from_slice(&nonce_bytes);
@@ -68,9 +65,9 @@ pub fn decrypt_bytes(
     let cipher = XChaCha20Poly1305::new(Key::from_slice(key));
     let nonce = XNonce::from_slice(nonce_bytes);
 
-    let plaintext = cipher
-        .decrypt(nonce, ciphertext)
-        .map_err(|_| anyhow!("Decryption failed: invalid key, corrupted data, or authentication failure"))?;
+    let plaintext = cipher.decrypt(nonce, ciphertext).map_err(|_| {
+        anyhow!("Decryption failed: invalid key, corrupted data, or authentication failure")
+    })?;
 
     Ok(Zeroizing::new(plaintext))
 }

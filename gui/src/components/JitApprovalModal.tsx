@@ -1,10 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bot, Terminal, X, Shield, KeyRound } from 'lucide-react';
 import { JitRequest } from '../types';
 
 interface JitApprovalModalProps {
   request: JitRequest | null;
-  onRespond: (requestId: string, action: 'deny' | 'once' | 'always') => Promise<void>;
+  onRespond: (requestId: string, action: 'deny' | 'once' | 'always', value?: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -13,6 +13,12 @@ export const JitApprovalModal: React.FC<JitApprovalModalProps> = ({
   onRespond,
   onClose,
 }) => {
+  const [secretValue, setSecretValue] = useState('');
+
+  useEffect(() => {
+    setSecretValue('');
+  }, [request?.id]);
+
   useEffect(() => {
     if (!request) return;
 
@@ -20,21 +26,33 @@ export const JitApprovalModal: React.FC<JitApprovalModalProps> = ({
       if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
-      } else if (e.key === 'd' || e.key === 'D') {
+        return;
+      }
+
+      // If user is focused on the password input, don't trigger single-letter hotkeys
+      if ((e.target as HTMLElement)?.tagName === 'INPUT') {
+        if (e.key === 'Enter' && secretValue.trim()) {
+          e.preventDefault();
+          onRespond(request.id, 'always', secretValue.trim());
+        }
+        return;
+      }
+
+      if (e.key === 'd' || e.key === 'D') {
         e.preventDefault();
         onRespond(request.id, 'deny');
-      } else if (e.key === 'o' || e.key === 'O') {
+      } else if ((e.key === 'o' || e.key === 'O') && secretValue.trim()) {
         e.preventDefault();
-        onRespond(request.id, 'once');
-      } else if (e.key === 'a' || e.key === 'A') {
+        onRespond(request.id, 'once', secretValue.trim());
+      } else if ((e.key === 'a' || e.key === 'A') && secretValue.trim()) {
         e.preventDefault();
-        onRespond(request.id, 'always');
+        onRespond(request.id, 'always', secretValue.trim());
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [request, onRespond, onClose]);
+  }, [request, secretValue, onRespond, onClose]);
 
   if (!request) return null;
 
@@ -107,8 +125,24 @@ export const JitApprovalModal: React.FC<JitApprovalModalProps> = ({
             </div>
           </div>
 
+          {/* Secret Value Input Field (N1 fix) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-white flex items-center justify-between">
+              <span>Secret Value for {request.key}</span>
+              <span className="text-[11px] text-[#808080]">Required to authorize</span>
+            </label>
+            <input
+              type="password"
+              value={secretValue}
+              onChange={(e) => setSecretValue(e.target.value)}
+              placeholder="Paste credential to authorize (e.g. sk-...)"
+              className="w-full px-3 py-2 rounded-lg bg-surface border border-border-subtle focus:border-white focus:outline-none text-xs text-white placeholder-[#808080] font-mono select-text"
+              autoFocus
+            />
+          </div>
+
           <p className="text-xs text-[#808080] leading-relaxed">
-            The agent initiated an outbound AI call missing credentials. Authorizing injects the key directly into process memory without session restart.
+            The agent initiated an outbound AI call without credentials. Authorizing injects the key into process memory without session restart.
           </p>
 
           {/* Action Decision Buttons */}
@@ -124,8 +158,9 @@ export const JitApprovalModal: React.FC<JitApprovalModalProps> = ({
 
             {/* Allow Once Button */}
             <button
-              onClick={() => onRespond(request.id, 'once')}
-              className="flex flex-col items-center justify-center p-2.5 rounded-lg bg-surface hover:bg-surface-hover border border-border-subtle hover:border-border-track text-zinc-200 hover:text-white transition-all duration-150 ease-spring active:scale-[0.98] cursor-pointer"
+              disabled={!secretValue.trim()}
+              onClick={() => onRespond(request.id, 'once', secretValue.trim())}
+              className="flex flex-col items-center justify-center p-2.5 rounded-lg bg-surface hover:bg-surface-hover border border-border-subtle hover:border-border-track text-zinc-200 hover:text-white transition-all duration-150 ease-spring active:scale-[0.98] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <span className="text-xs font-semibold">Allow Once</span>
               <span className="text-[10px] text-[#6E6E73] mt-0.5 font-mono">[O]</span>
@@ -133,8 +168,9 @@ export const JitApprovalModal: React.FC<JitApprovalModalProps> = ({
 
             {/* Always Allow Button */}
             <button
-              onClick={() => onRespond(request.id, 'always')}
-              className="flex flex-col items-center justify-center p-2.5 rounded-lg bg-white hover:bg-zinc-200 text-black transition-all duration-150 ease-spring active:scale-[0.98] cursor-pointer font-bold shadow-sm"
+              disabled={!secretValue.trim()}
+              onClick={() => onRespond(request.id, 'always', secretValue.trim())}
+              className="flex flex-col items-center justify-center p-2.5 rounded-lg bg-white hover:bg-zinc-200 text-black transition-all duration-150 ease-spring active:scale-[0.98] cursor-pointer font-bold shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <span className="text-xs font-bold">Always Allow</span>
               <span className="text-[10px] text-zinc-600 mt-0.5 font-mono">[A]</span>

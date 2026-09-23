@@ -5,6 +5,7 @@ pub mod project;
 pub mod proxy;
 pub mod runner;
 pub mod security;
+pub mod setup;
 pub mod storage;
 
 pub use project::GLOBAL_NAMESPACE;

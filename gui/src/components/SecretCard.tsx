@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, Copy, Check, Trash2, ShieldCheck, Database, KeyRound, Lock } from 'lucide-react';
 import { SecretItem } from '../types';
+import { api } from '../api';
 
 interface SecretCardProps {
   secret: SecretItem;
-  onRevealToggle: (key: string, currentRevealed: boolean) => Promise<string | void>;
-  onDelete: (key: string) => Promise<void>;
+  onRevealToggle: (secret: SecretItem, currentRevealed: boolean) => Promise<string | void>;
+  onDelete: (secret: SecretItem) => Promise<void>;
   onCopySuccess: (key: string) => void;
 }
 
@@ -22,7 +23,7 @@ export const SecretCard: React.FC<SecretCardProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [copyTimeLeft, setCopyTimeLeft] = useState<number>(0);
 
-  // 30-second clipboard countdown
+  // 30-second clipboard countdown with real auto-wipe
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;
     if (isCopied) {
@@ -32,6 +33,7 @@ export const SecretCard: React.FC<SecretCardProps> = ({
           if (prev <= 1) {
             setIsCopied(false);
             clearInterval(timer);
+            navigator.clipboard?.writeText('').catch(() => {});
             return 0;
           }
           return prev - 1;
@@ -50,7 +52,7 @@ export const SecretCard: React.FC<SecretCardProps> = ({
 
     try {
       setIsLoadingReveal(true);
-      const val = await onRevealToggle(secret.key, isRevealed);
+      const val = await onRevealToggle(secret, isRevealed);
       if (typeof val === 'string') {
         setRevealedValue(val);
       }
@@ -64,8 +66,8 @@ export const SecretCard: React.FC<SecretCardProps> = ({
 
   const handleCopy = async () => {
     try {
-      const valToCopy = secret.fullValue || revealedValue || secret.maskedValue;
-      await navigator.clipboard.writeText(valToCopy);
+      const scopeParam = secret.scope === 'project' ? (secret.project || 'cloak-core') : 'global';
+      await api.copySecretSecure(secret.key, scopeParam);
       setIsCopied(true);
       onCopySuccess(secret.key);
     } catch (err) {
@@ -78,7 +80,7 @@ export const SecretCard: React.FC<SecretCardProps> = ({
       setIsDeleting(true);
       return;
     }
-    await onDelete(secret.key);
+    await onDelete(secret);
   };
 
   const renderCategoryIcon = () => {
@@ -127,10 +129,23 @@ export const SecretCard: React.FC<SecretCardProps> = ({
             </span>
           )}
 
-          <span className="hidden sm:inline-flex items-center gap-1 text-[10px] text-[#808080]">
-            <ShieldCheck className="w-3 h-3 text-burnrate-ample" />
-            Keychain
-          </span>
+          {secret.hardwareProtected ? (
+            <span
+              className="hidden sm:inline-flex items-center gap-1 text-[10px] text-burnrate-watch bg-[#FF9900]/10 px-1.5 py-0.5 rounded border border-[#FF9900]/30 font-mono font-medium"
+              title="Hardware ACL: Protected by Secure Enclave / Biometrics"
+            >
+              <ShieldCheck className="w-3 h-3 text-burnrate-watch" />
+              Touch ID Enclave
+            </span>
+          ) : (
+            <span
+              className="hidden sm:inline-flex items-center gap-1 text-[10px] text-[#808080] bg-surface-active px-1.5 py-0.5 rounded border border-border-subtle font-mono"
+              title="Stored in standard OS Keychain"
+            >
+              <ShieldCheck className="w-3 h-3 text-burnrate-ample" />
+              Standard Keyring
+            </span>
+          )}
         </div>
       </div>
 
@@ -139,7 +154,7 @@ export const SecretCard: React.FC<SecretCardProps> = ({
         {/* Value Display */}
         <div className="min-w-0 flex-1 font-mono text-xs text-[#808080] select-text truncate">
           {isLoadingReveal ? (
-            <span className="text-[#6E6E73] animate-pulse">Decrypting with Secure Enclave...</span>
+            <span className="text-[#6E6E73] animate-pulse">Decrypting with OS Keychain...</span>
           ) : isRevealed && revealedValue ? (
             <span className="text-white font-medium break-all">{revealedValue}</span>
           ) : (

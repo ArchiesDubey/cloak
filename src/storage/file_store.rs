@@ -79,11 +79,8 @@ impl FileStore {
         let vault_file: VaultFile = serde_json::from_slice(&content)
             .map_err(|e| anyhow!("Failed to deserialize vault: {e}"))?;
 
-        let decrypted = crypto::decrypt_bytes(
-            &self.master_key,
-            &vault_file.nonce,
-            &vault_file.ciphertext,
-        )?;
+        let decrypted =
+            crypto::decrypt_bytes(&self.master_key, &vault_file.nonce, &vault_file.ciphertext)?;
 
         let data: VaultData = serde_json::from_slice(&decrypted)
             .map_err(|e| anyhow!("Corrupted decrypted vault payload: {e}"))?;
@@ -111,14 +108,26 @@ impl FileStore {
         };
 
         let serialized = serde_json::to_vec_pretty(&vf)?;
-        fs::write(&self.path, serialized)?;
-
-        #[cfg(unix)]
+        let tmp_path = format!("{}.tmp.{}", self.path.display(), std::process::id());
         {
-            use std::os::unix::fs::PermissionsExt;
-            let _ = fs::set_permissions(&self.path, fs::Permissions::from_mode(0o600));
+            use std::io::Write;
+            let mut f = fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(&tmp_path)?;
+
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = f.set_permissions(fs::Permissions::from_mode(0o600));
+            }
+
+            f.write_all(&serialized)?;
+            f.sync_all()?;
         }
 
+        fs::rename(&tmp_path, &self.path)?;
         Ok(())
     }
 }
@@ -133,12 +142,24 @@ impl SecretStore for FileStore {
         self.save_data(&data)
     }
 
-    fn get(&self, namespace: &str, key: &str) -> Result<Option<String>> {
+    fn get(&self, namespace: &str, key: &str) -> Result<Option<Zeroizing<String>>> {
         let data = self.load_data()?;
         Ok(data
             .namespaces
             .get(namespace)
-            .and_then(|ns| ns.get(key).cloned()))
+            .and_then(|ns| ns.get(key).cloned())
+            .map(Zeroizing::new))
+    }
+
+    fn get_all(&self, namespace: &str) -> Result<HashMap<String, Zeroizing<String>>> {
+        let data = self.load_data()?;
+        let mut result = HashMap::new();
+        if let Some(ns) = data.namespaces.get(namespace) {
+            for (k, v) in ns {
+                result.insert(k.clone(), Zeroizing::new(v.clone()));
+            }
+        }
+        Ok(result)
     }
 
     fn list(&self, namespace: &str) -> Result<Vec<String>> {
@@ -180,11 +201,17 @@ mod tests {
 
         let store = FileStore::new(vault_path.clone(), password).unwrap();
         store.set("default", "API_KEY", "sk-12345").unwrap();
-        store.set("default", "DB_URL", "postgres://localhost").unwrap();
+        store
+            .set("default", "DB_URL", "postgres://localhost")
+            .unwrap();
 
         assert_eq!(
-            store.get("default", "API_KEY").unwrap(),
-            Some("sk-12345".to_string())
+            store
+                .get("default", "API_KEY")
+                .unwrap()
+                .as_deref()
+                .map(|s| s.as_str()),
+            Some("sk-12345")
         );
 
         let list = store.list("default").unwrap();
@@ -193,8 +220,12 @@ mod tests {
         // Re-open with same password
         let store2 = FileStore::new(vault_path.clone(), password).unwrap();
         assert_eq!(
-            store2.get("default", "API_KEY").unwrap(),
-            Some("sk-12345".to_string())
+            store2
+                .get("default", "API_KEY")
+                .unwrap()
+                .as_deref()
+                .map(|s| s.as_str()),
+            Some("sk-12345")
         );
 
         // Re-open with wrong password should fail to read

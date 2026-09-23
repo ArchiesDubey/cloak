@@ -37,7 +37,7 @@ export const Header: React.FC<HeaderProps> = ({
                 [ CLOAK ]
               </span>
               <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-inset text-radar-glow border border-white/5 font-semibold">
-                v0.1
+                v0.5.1
               </span>
             </div>
             <span className="text-[9px] font-mono text-gray-400 leading-none">

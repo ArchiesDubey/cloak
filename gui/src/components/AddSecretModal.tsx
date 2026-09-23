@@ -5,7 +5,13 @@ import { SecretScope } from '../types';
 interface AddSecretModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (key: string, value: string, scope: SecretScope, project?: string) => Promise<void>;
+  onSave: (
+    key: string,
+    value: string,
+    scope: SecretScope,
+    project?: string,
+    hardwareProtected?: boolean
+  ) => Promise<void>;
   defaultScope?: SecretScope;
   currentProjectName?: string;
 }
@@ -21,6 +27,7 @@ export const AddSecretModal: React.FC<AddSecretModalProps> = ({
   const [value, setValue] = useState('');
   const [scope, setScope] = useState<SecretScope>(defaultScope);
   const [project, setProject] = useState(currentProjectName);
+  const [hardwareProtected, setHardwareProtected] = useState(false);
   const [showValue, setShowValue] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -33,6 +40,7 @@ export const AddSecretModal: React.FC<AddSecretModalProps> = ({
       setValue('');
       setScope(defaultScope);
       setProject(currentProjectName);
+      setHardwareProtected(false);
       setErrorMessage(null);
       setTimeout(() => {
         keyInputRef.current?.focus();
@@ -73,7 +81,8 @@ export const AddSecretModal: React.FC<AddSecretModalProps> = ({
         key.trim().toUpperCase(),
         value.trim(),
         scope,
-        scope === 'project' ? project.trim() : undefined
+        scope === 'project' ? project.trim() : undefined,
+        hardwareProtected
       );
       onClose();
     } catch (err: any) {
@@ -215,10 +224,25 @@ export const AddSecretModal: React.FC<AddSecretModalProps> = ({
             </div>
           </div>
 
-          {/* Hardware notice */}
-          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-surface-active/60 border border-border-subtle text-xs text-[#808080]">
-            <ShieldCheck className="w-4 h-4 text-burnrate-ample flex-shrink-0" />
-            <span>Encrypted directly into Apple Keychain / Secure Enclave hardware block.</span>
+          {/* Hardware notice & Touch ID gating toggle */}
+          <div className="p-3 rounded-lg bg-surface-active/60 border border-border-subtle space-y-2">
+            <label className="flex items-center gap-2.5 cursor-pointer text-xs text-zinc-200 select-none">
+              <input
+                type="checkbox"
+                checked={hardwareProtected}
+                onChange={(e) => setHardwareProtected(e.target.checked)}
+                className="w-4 h-4 rounded bg-surface border-border-subtle text-burnrate-watch focus:ring-0 cursor-pointer accent-[#FF9900]"
+              />
+              <span className="flex items-center gap-1.5 font-medium">
+                <ShieldCheck className={`w-3.5 h-3.5 ${hardwareProtected ? 'text-burnrate-watch' : 'text-burnrate-ample'}`} />
+                Require Touch ID Hardware ACL
+              </span>
+            </label>
+            <p className="text-[11px] text-[#808080] pl-6.5 leading-relaxed">
+              {hardwareProtected
+                ? 'Protected with Apple Secure Enclave / Touch ID. Biometric authentication required on every secret reveal.'
+                : 'Stored securely in macOS Keychain / OS Keyring with standard OS authorization.'}
+            </p>
           </div>
 
           {/* Modal Actions */}

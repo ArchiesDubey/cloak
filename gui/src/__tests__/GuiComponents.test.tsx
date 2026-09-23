@@ -47,7 +47,7 @@ describe('GUI Component Tests: Cloak Minimal Desktop', () => {
     const revealBtn = screen.getByTitle('Decrypt & reveal value');
     fireEvent.click(revealBtn);
 
-    expect(revealMock).toHaveBeenCalledWith('OPENAI_API_KEY', false);
+    expect(revealMock).toHaveBeenCalledWith(mockSecret, false);
     const revealedVal = await screen.findByText('sk-proj-actual-secret');
     expect(revealedVal).toBeInTheDocument();
   });
@@ -103,13 +103,16 @@ describe('GUI Component Tests: Cloak Minimal Desktop', () => {
     expect(screen.getByText('OPENAI_API_KEY')).toBeInTheDocument();
     expect(screen.getByText('https://api.openai.com/v1/chat/completions')).toBeInTheDocument();
 
+    const secretInput = screen.getByPlaceholderText(/Paste credential/);
+    fireEvent.change(secretInput, { target: { value: 'sk-test-secret-value-12345' } });
+
     const allowOnceBtn = screen.getByText('Allow Once');
     fireEvent.click(allowOnceBtn);
-    expect(onRespond).toHaveBeenCalledWith('req_123', 'once');
+    expect(onRespond).toHaveBeenCalledWith('req_123', 'once', 'sk-test-secret-value-12345');
 
     const alwaysAllowBtn = screen.getByText('Always Allow');
     fireEvent.click(alwaysAllowBtn);
-    expect(onRespond).toHaveBeenCalledWith('req_123', 'always');
+    expect(onRespond).toHaveBeenCalledWith('req_123', 'always', 'sk-test-secret-value-12345');
 
     const denyBtn = screen.getByText('Deny');
     fireEvent.click(denyBtn);
@@ -143,7 +146,7 @@ describe('GUI Component Tests: Cloak Minimal Desktop', () => {
       fireEvent.click(submitBtn);
     });
 
-    expect(onSave).toHaveBeenCalledWith('ANTHROPIC_API_KEY', 'sk-ant-secret12345', 'global', undefined);
+    expect(onSave).toHaveBeenCalledWith('ANTHROPIC_API_KEY', 'sk-ant-secret12345', 'global', undefined, false);
   });
 
   it('Sidebar renders branding, vault navigation, and hardware status', () => {
@@ -178,11 +181,11 @@ describe('GUI Component Tests: Cloak Minimal Desktop', () => {
     );
 
     expect(screen.getByText('Cloak')).toBeInTheDocument();
-    expect(screen.getByText('v0.1')).toBeInTheDocument();
+    expect(screen.getByText('v0.5.1')).toBeInTheDocument();
     expect(screen.getByText('All Secrets')).toBeInTheDocument();
     expect(screen.getByText('Global (Keychain)')).toBeInTheDocument();
     expect(screen.getByText('cloak-core')).toBeInTheDocument();
     expect(screen.getByText('AI Proxy :4141')).toBeInTheDocument();
-    expect(screen.getByText('Hardware Enclave')).toBeInTheDocument();
+    expect(screen.getByText('Keychain Vault')).toBeInTheDocument();
   });
 });

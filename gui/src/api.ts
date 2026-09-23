@@ -2,7 +2,6 @@ import { invoke } from '@tauri-apps/api/core';
 import { SecretItem, ProxyStatus, SecurityStatus, JitRequest, SecretScope } from './types';
 import { INITIAL_SECRETS, INITIAL_PROXY_STATUS, INITIAL_SECURITY_STATUS, INITIAL_PENDING_JIT } from './mockData';
 
-// Check if running inside a Tauri desktop container
 declare global {
   interface Window {
     __TAURI_INTERNALS__?: unknown;
@@ -29,52 +28,62 @@ async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Prom
       throw err;
     }
   }
-  throw new Error('Tauri invoke IPC is not available');
+  throw new Error('Tauri invoke IPC is not available in standalone web browser');
 }
 
-// In-memory mock storage for browser testing / demo mode
+// In-memory mock storage for browser testing / demo mode only
 let mockSecrets: SecretItem[] = [...INITIAL_SECRETS];
 let mockProxyStatus: ProxyStatus = { ...INITIAL_PROXY_STATUS };
 let mockSecurityStatus: SecurityStatus = { ...INITIAL_SECURITY_STATUS };
 let mockPendingJit: JitRequest | null = INITIAL_PENDING_JIT;
 
-// Helper to simulate realistic hardware keystore delay
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const api = {
+  resetMockState: (): void => {
+    mockSecrets = [...INITIAL_SECRETS];
+    mockProxyStatus = { ...INITIAL_PROXY_STATUS };
+    mockSecurityStatus = { ...INITIAL_SECURITY_STATUS };
+    mockPendingJit = INITIAL_PENDING_JIT;
+  },
   isDesktopApp: (): boolean => isTauri(),
 
   async listSecrets(scope?: string): Promise<SecretItem[]> {
     if (isTauri()) {
-      try {
-        const dtos = await tauriInvoke<
-          Array<{
-            id: string;
-            key: string;
-            masked_value: string;
-            scope: string;
-            updated_at: string;
-          }>
-        >('list_secrets');
+      // In desktop app, never fall back to mock data (A1 fix). Let errors surface!
+      const dtos = await tauriInvoke<
+        Array<{
+          id: string;
+          key: string;
+          masked_value: string;
+          scope: string;
+          updated_at: string;
+          hardware_protected?: boolean;
+        }>
+      >('list_secrets');
 
-        return dtos.map((d) => ({
-          key: d.key,
-          maskedValue: d.masked_value,
-          scope: (d.scope === 'global' ? 'global' : 'project') as SecretScope,
-          project: d.scope !== 'global' ? d.scope : undefined,
-          updatedAt: d.updated_at,
-          category: d.key.toLowerCase().includes('db') || d.key.toLowerCase().includes('database')
-            ? 'database'
-            : d.key.toLowerCase().includes('token')
-            ? 'token'
-            : 'api-key',
-          hardwareStored: true,
-        }));
-      } catch (err) {
-        console.warn('Tauri invoke failed, falling back to mock storage', err);
+      const items: SecretItem[] = dtos.map((d) => ({
+        key: d.key,
+        maskedValue: d.masked_value,
+        scope: (d.scope === 'global' ? 'global' : 'project') as SecretScope,
+        project: d.scope !== 'global' ? d.scope : undefined,
+        updatedAt: d.updated_at,
+        category: d.key.toLowerCase().includes('db') || d.key.toLowerCase().includes('database')
+          ? 'database'
+          : d.key.toLowerCase().includes('token')
+          ? 'token'
+          : 'api-key',
+        hardwareStored: true,
+        hardwareProtected: d.hardware_protected ?? false,
+      }));
+
+      if (!scope || scope === 'all') {
+        return items;
       }
+      return items.filter((s) => s.scope === scope);
     }
 
+    // Standalone browser fallback for Vite dev
     await delay(60);
     if (!scope || scope === 'all') {
       return [...mockSecrets];
@@ -84,11 +93,8 @@ export const api = {
 
   async getSecret(key: string, reveal: boolean, scope: string = 'global'): Promise<string> {
     if (isTauri()) {
-      try {
-        return await tauriInvoke<string>('reveal_secret', { scope, key });
-      } catch (err) {
-        console.warn('Tauri invoke reveal_secret failed, falling back to mock storage', err);
-      }
+      // Direct IPC call. If user cancels Touch ID or vault is locked, throws error to UI.
+      return await tauriInvoke<string>('reveal_secret', { scope, key });
     }
 
     await delay(80);
@@ -101,23 +107,44 @@ export const api = {
     key: string,
     value: string,
     scope: SecretScope = 'global',
-    project?: string
+    project?: string,
+    hardwareProtected: boolean = false
   ): Promise<SecretItem> {
     const scopeParam = scope === 'global' ? 'global' : (project || 'cloak-core');
     if (isTauri()) {
-      try {
-        await tauriInvoke<void>('save_secret', { scope: scopeParam, key, value });
-      } catch (err) {
-        console.warn('Tauri invoke save_secret failed, falling back to mock storage', err);
-      }
+      await tauriInvoke<void>('save_secret', {
+        scope: scopeParam,
+        key,
+        value,
+        hardwareProtected,
+      });
+
+      const maskedPrefix = value.slice(0, Math.min(4, Math.floor(value.length / 3)));
+      const maskedSuffix = value.length > 8 ? value.slice(-4) : '';
+      const maskedValue = `${maskedPrefix}••••••••${maskedSuffix}`;
+
+      return {
+        key,
+        maskedValue,
+        fullValue: value,
+        scope,
+        project: scope === 'project' ? scopeParam : undefined,
+        updatedAt: hardwareProtected ? 'Touch ID Secure Enclave' : 'Stored in Keychain',
+        category: key.toLowerCase().includes('db') || key.toLowerCase().includes('database')
+          ? 'database'
+          : key.toLowerCase().includes('token')
+          ? 'token'
+          : 'api-key',
+        hardwareStored: true,
+        hardwareProtected,
+      };
     }
 
     await delay(120);
-    const maskedPrefix = value.slice(0, Math.min(6, Math.floor(value.length / 3)));
+    const maskedPrefix = value.slice(0, Math.min(4, Math.floor(value.length / 3)));
     const maskedSuffix = value.length > 8 ? value.slice(-4) : '';
     const maskedValue = `${maskedPrefix}••••••••${maskedSuffix}`;
 
-    const existingIndex = mockSecrets.findIndex((s) => s.key === key);
     const newSecret: SecretItem = {
       key,
       maskedValue,
@@ -133,6 +160,7 @@ export const api = {
       hardwareStored: true,
     };
 
+    const existingIndex = mockSecrets.findIndex((s) => s.key === key);
     if (existingIndex >= 0) {
       mockSecrets[existingIndex] = newSecret;
     } else {
@@ -144,16 +172,27 @@ export const api = {
 
   async deleteSecret(key: string, scope: string = 'global'): Promise<boolean> {
     if (isTauri()) {
-      try {
-        await tauriInvoke<void>('delete_secret', { scope, key });
-        return true;
-      } catch (err) {
-        console.warn('Tauri invoke delete_secret failed, falling back to mock storage', err);
-      }
+      await tauriInvoke<void>('delete_secret', { scope, key });
+      return true;
     }
 
     await delay(100);
     mockSecrets = mockSecrets.filter((s) => s.key !== key);
+    return true;
+  },
+
+  async copySecretSecure(key: string, scope: string = 'global'): Promise<boolean> {
+    if (isTauri()) {
+      await tauriInvoke<void>('copy_secret_secure', { scope, key });
+      return true;
+    }
+
+    await delay(50);
+    const item = mockSecrets.find((s) => s.key === key);
+    const val = item?.fullValue || item?.maskedValue || '';
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(val);
+    }
     return true;
   },
 
@@ -172,7 +211,7 @@ export const api = {
           interceptCount: mockProxyStatus.interceptCount,
         };
       } catch (err) {
-        console.warn('Tauri invoke check_proxy_status failed, falling back to mock storage', err);
+        console.warn('Tauri invoke check_proxy_status failed', err);
       }
     }
 
@@ -182,11 +221,17 @@ export const api = {
 
   async toggleProxy(): Promise<ProxyStatus> {
     if (isTauri()) {
-      try {
-        return await tauriInvoke<ProxyStatus>('toggle_proxy');
-      } catch (err) {
-        console.warn('Tauri invoke failed, falling back to mock storage', err);
-      }
+      const dto = await tauriInvoke<{
+        active: boolean;
+        port: number;
+        openai_configured: boolean;
+        anthropic_configured: boolean;
+      }>('toggle_proxy');
+      return {
+        running: dto.active,
+        port: dto.port,
+        interceptCount: mockProxyStatus.interceptCount,
+      };
     }
 
     await delay(150);
@@ -208,48 +253,34 @@ export const api = {
         return {
           ...mockSecurityStatus,
           isUnlocked: res.is_unlocked,
-          hardwareBackend: 'Apple Keychain (Secure Enclave)',
-          biometricType: 'Touch ID',
+          hardwareBackend: res.hardware_backend as SecurityStatus['hardwareBackend'],
         };
       } catch (err) {
-        console.warn('Tauri invoke failed, falling back to mock storage', err);
+        console.warn('Tauri invoke get_security_status failed', err);
       }
     }
 
-    await delay(40);
+    await delay(50);
     return { ...mockSecurityStatus };
   },
 
   async authenticateVault(): Promise<boolean> {
     if (isTauri()) {
-      try {
-        const success = await tauriInvoke<boolean>('authenticate_vault');
-        mockSecurityStatus.isUnlocked = success;
-        return success;
-      } catch (err) {
-        console.error('[Cloak] authenticate_vault error:', err);
-        return false;
-      }
+      return await tauriInvoke<boolean>('authenticate_vault');
     }
 
-    await delay(250);
-    mockSecurityStatus.isUnlocked = true;
+    await delay(350);
+    mockSecurityStatus = { ...mockSecurityStatus, isUnlocked: true };
     return true;
   },
 
   async lockVault(): Promise<boolean> {
     if (isTauri()) {
-      try {
-        await tauriInvoke<boolean>('lock_vault');
-        mockSecurityStatus.isUnlocked = false;
-        return false;
-      } catch (err) {
-        console.warn('Tauri invoke failed, falling back to mock lock', err);
-      }
+      return await tauriInvoke<boolean>('lock_vault');
     }
 
-    await delay(80);
-    mockSecurityStatus.isUnlocked = false;
+    await delay(50);
+    mockSecurityStatus = { ...mockSecurityStatus, isUnlocked: false };
     return false;
   },
 
@@ -263,24 +294,32 @@ export const api = {
 
   async getPendingJitRequest(): Promise<JitRequest | null> {
     if (isTauri()) {
-      try {
-        return await tauriInvoke<JitRequest | null>('get_pending_jit_request');
-      } catch (err) {
-        console.warn('Tauri invoke failed, falling back to mock storage', err);
-      }
+      const dto = await tauriInvoke<{
+        id: string;
+        agent: string;
+        key: string;
+        target_endpoint: string;
+        timestamp: string;
+      } | null>('get_pending_jit_request');
+
+      if (!dto) return null;
+      return {
+        id: dto.id,
+        agent: dto.agent,
+        key: dto.key,
+        targetEndpoint: dto.target_endpoint,
+        timestamp: dto.timestamp,
+        status: 'pending',
+      };
     }
 
     await delay(50);
     return mockPendingJit;
   },
 
-  async respondJit(requestId: string, action: 'deny' | 'once' | 'always'): Promise<boolean> {
+  async respondJit(requestId: string, action: 'deny' | 'once' | 'always', value?: string): Promise<boolean> {
     if (isTauri()) {
-      try {
-        return await tauriInvoke<boolean>('respond_jit', { requestId, action });
-      } catch (err) {
-        console.warn('Tauri invoke failed, falling back to mock storage', err);
-      }
+      return await tauriInvoke<boolean>('respond_jit', { requestId, action, value: value || null });
     }
 
     await delay(100);
@@ -298,4 +337,51 @@ export const api = {
     }
     return false;
   },
+
+  async getCliStatus(): Promise<{ isInstalled: boolean; cliPath?: string; targetSymlink?: string; message: string }> {
+    if (isTauri()) {
+      const dto = await tauriInvoke<{
+        is_installed: boolean;
+        cli_path?: string;
+        target_symlink?: string;
+        message: string;
+      }>('get_cli_status');
+      return {
+        isInstalled: dto.is_installed,
+        cliPath: dto.cli_path,
+        targetSymlink: dto.target_symlink,
+        message: dto.message,
+      };
+    }
+    return {
+      isInstalled: true,
+      cliPath: '/Applications/Cloak.app/Contents/Resources/cloak',
+      targetSymlink: '/usr/local/bin/cloak',
+      message: 'CLI active at /usr/local/bin/cloak',
+    };
+  },
+
+  async installCliSymlink(): Promise<{ isInstalled: boolean; cliPath?: string; targetSymlink?: string; message: string }> {
+    if (isTauri()) {
+      const dto = await tauriInvoke<{
+        is_installed: boolean;
+        cli_path?: string;
+        target_symlink?: string;
+        message: string;
+      }>('install_cli_symlink');
+      return {
+        isInstalled: dto.is_installed,
+        cliPath: dto.cli_path,
+        targetSymlink: dto.target_symlink,
+        message: dto.message,
+      };
+    }
+    return {
+      isInstalled: true,
+      cliPath: '/Applications/Cloak.app/Contents/Resources/cloak',
+      targetSymlink: '/usr/local/bin/cloak',
+      message: 'Successfully installed CLI symlink at /usr/local/bin/cloak',
+    };
+  },
 };
+

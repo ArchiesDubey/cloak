@@ -1,6 +1,7 @@
-import React from 'react';
-import { Cpu, Activity, Terminal, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Cpu, Activity, Terminal, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
 import { ProxyStatus, SecurityStatus } from '../types';
+import { api } from '../api';
 
 interface TelemetryPanelProps {
   proxyStatus: ProxyStatus;
@@ -15,6 +16,29 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
   totalSecretsCount,
   onSimulateJit,
 }) => {
+  const [cliStatus, setCliStatus] = useState<{ isInstalled: boolean; targetSymlink?: string; message: string }>({
+    isInstalled: true,
+    targetSymlink: '/usr/local/bin/cloak',
+    message: 'CLI active in PATH',
+  });
+  const [linkingCli, setLinkingCli] = useState(false);
+
+  useEffect(() => {
+    api.getCliStatus().then(setCliStatus).catch(() => {});
+  }, []);
+
+  const handleInstallCli = async () => {
+    setLinkingCli(true);
+    try {
+      const res = await api.installCliSymlink();
+      setCliStatus(res);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLinkingCli(false);
+    }
+  };
+
   return (
     <aside className="w-80 flex-shrink-0 flex flex-col gap-3 p-3 bg-surface/80 rounded-lg border border-subpixel font-mono select-none">
       {/* Hardware Keystore Telemetry */}
@@ -22,7 +46,7 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
         <div className="flex items-center justify-between text-xs font-bold text-gray-200">
           <span className="flex items-center gap-1.5">
             <Cpu className="w-3.5 h-3.5 text-radar-core" />
-            ENCLAVE ENCRYPTION
+            KEYCHAIN SECURITY
           </span>
           <span className="text-[10px] text-radar-glow px-1.5 py-0.2 rounded bg-radar-dim border border-radar-border">
             SECURE
@@ -100,6 +124,47 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
         >
           <RefreshCw className="w-3 h-3 text-radar-core" />
           <span>SIMULATE JIT AGENT EVENT</span>
+        </button>
+      </div>
+
+      {/* Terminal CLI Integration Card */}
+      <div className="p-3 bg-inset rounded border border-subpixel space-y-2">
+        <div className="flex items-center justify-between text-xs font-bold text-gray-200">
+          <span className="flex items-center gap-1.5">
+            <Terminal className="w-3.5 h-3.5 text-radar-core" />
+            TERMINAL CLI
+          </span>
+          <span
+            className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
+              cliStatus.isInstalled
+                ? 'bg-radar-dim text-radar-glow border border-radar-border'
+                : 'bg-burnrate-critical/20 text-burnrate-critical border border-burnrate-critical/30'
+            }`}
+          >
+            {cliStatus.isInstalled ? 'ACTIVE' : 'UNLINKED'}
+          </span>
+        </div>
+
+        <div className="space-y-1 text-[11px] text-gray-400">
+          <div className="flex items-center gap-1.5">
+            {cliStatus.isInstalled ? (
+              <CheckCircle2 className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+            ) : (
+              <AlertCircle className="w-3 h-3 text-burnrate-critical flex-shrink-0" />
+            )}
+            <span className="text-[10px] truncate text-gray-300">
+              {cliStatus.targetSymlink || '/usr/local/bin/cloak'}
+            </span>
+          </div>
+        </div>
+
+        <button
+          onClick={handleInstallCli}
+          disabled={linkingCli}
+          className="w-full mt-1.5 flex items-center justify-center gap-1.5 py-1 rounded bg-surface hover:bg-elevated text-gray-300 border border-white/5 text-[10px] transition-all hover:border-radar-core cursor-pointer active:scale-98 disabled:opacity-50"
+          title="Install or update symbolic link to /usr/local/bin/cloak"
+        >
+          <span>{linkingCli ? 'Linking...' : 'Re-link CLI to Terminal'}</span>
         </button>
       </div>
 

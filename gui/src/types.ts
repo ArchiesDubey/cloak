@@ -10,6 +10,7 @@ export interface SecretItem {
   updatedAt: string;
   category: 'api-key' | 'database' | 'token' | 'certificate' | 'env';
   hardwareStored: boolean;
+  hardwareProtected?: boolean;
 }
 
 export interface ProxyStatus {
@@ -34,7 +35,7 @@ export interface JitRequest {
 }
 
 export interface SecurityStatus {
-  hardwareBackend: 'Apple Keychain (Secure Enclave)' | 'Windows Credential Manager' | 'Linux Secret Service' | 'Encrypted File Vault';
+  hardwareBackend: 'macOS Keychain (OS Keyring)' | 'Apple Keychain (Secure Enclave)' | 'Windows Credential Manager' | 'Linux Secret Service' | 'Encrypted File Vault';
   isUnlocked: boolean;
   biometricType: 'Touch ID' | 'Windows Hello' | 'Master Key' | 'Hardware Token';
   memoryLockActive: boolean;

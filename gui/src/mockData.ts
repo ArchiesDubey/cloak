@@ -1,10 +1,11 @@
 import { SecretItem, ProxyStatus, JitRequest, SecurityStatus } from './types';
 
+// Obvious placeholder test fixtures for standalone Vite browser dev only (A1 fix)
 export const INITIAL_SECRETS: SecretItem[] = [
   {
     key: 'OPENAI_API_KEY',
-    maskedValue: 'sk-proj-••••••••••••••••3819',
-    fullValue: 'sk-proj-9A8b7C6d5E4f3G2h1I0jKlMnOpQrStUvWxYz993819',
+    maskedValue: 'mock-••••••••••••••••0001',
+    fullValue: 'mock-test-fixture-openai-value-0001',
     scope: 'global',
     updatedAt: '12m ago',
     category: 'api-key',
@@ -12,8 +13,8 @@ export const INITIAL_SECRETS: SecretItem[] = [
   },
   {
     key: 'ANTHROPIC_API_KEY',
-    maskedValue: 'sk-ant-••••••••••••••••8821',
-    fullValue: 'sk-ant-api03-abcdef1234567890fedcba0987654321xyz8821',
+    maskedValue: 'mock-••••••••••••••••0002',
+    fullValue: 'mock-test-fixture-anthropic-value-0002',
     scope: 'global',
     updatedAt: '1h ago',
     category: 'api-key',
@@ -21,8 +22,8 @@ export const INITIAL_SECRETS: SecretItem[] = [
   },
   {
     key: 'DATABASE_URL',
-    maskedValue: 'postgres://app:••••••••@10.0.4.12:5432/production',
-    fullValue: 'postgres://app:super_secure_pg_pass_2026!@10.0.4.12:5432/production',
+    maskedValue: 'postgres://mock:••••••••@127.0.0.1:5432/test',
+    fullValue: 'postgres://mock:test_pass@127.0.0.1:5432/test',
     scope: 'project',
     project: 'cloak-core',
     updatedAt: '3h ago',
@@ -31,58 +32,24 @@ export const INITIAL_SECRETS: SecretItem[] = [
   },
   {
     key: 'AWS_SECRET_ACCESS_KEY',
-    maskedValue: 'wJalrX••••••••••••••••qX85',
-    fullValue: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEYqX85',
+    maskedValue: 'mock-••••••••••••••••0003',
+    fullValue: 'mock-test-fixture-aws-value-0003',
     scope: 'global',
     updatedAt: '2d ago',
-    category: 'token',
-    hardwareStored: true,
-  },
-  {
-    key: 'STRIPE_SECRET_KEY',
-    maskedValue: 'mock_test_key_0912••••••••••••••••0912',
-    fullValue: 'mock_test_key_0912',
-    scope: 'project',
-    project: 'payment-gateway',
-    updatedAt: '4d ago',
-    category: 'api-key',
-    hardwareStored: true,
-  },
-  {
-    key: 'GITHUB_TOKEN',
-    maskedValue: 'ghp_••••••••••••••••K18x',
-    fullValue: 'ghp_45AbcDefGhiJklMnoPqrStUvwXyz12345678K18x',
-    scope: 'global',
-    updatedAt: '5d ago',
-    category: 'token',
-    hardwareStored: true,
-  },
-  {
-    key: 'CLOUDFLARE_API_TOKEN',
-    maskedValue: 'CF_tok_••••••••••••••••Z912',
-    fullValue: 'CF_tok_9918237abcde4827103982173abcdef123456789Z912',
-    scope: 'project',
-    project: 'edge-worker',
-    updatedAt: '1w ago',
     category: 'token',
     hardwareStored: true,
   }
 ];
 
 export const INITIAL_PROXY_STATUS: ProxyStatus = {
-  running: true,
+  running: false,
   port: 4141,
-  interceptCount: 23,
-  lastIntercept: {
-    agent: 'claude-code',
-    path: '/v1/messages',
-    timestamp: '14s ago'
-  }
+  interceptCount: 0,
 };
 
 export const INITIAL_SECURITY_STATUS: SecurityStatus = {
-  hardwareBackend: 'Apple Keychain (Secure Enclave)',
-  isUnlocked: true,
+  hardwareBackend: 'macOS Keychain (OS Keyring)',
+  isUnlocked: false, // S2: Vault starts locked by default
   biometricType: 'Touch ID',
   memoryLockActive: true,
   coreDumpsDisabled: true,
