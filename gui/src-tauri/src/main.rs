@@ -664,26 +664,28 @@ pub struct CliStatusDto {
 }
 
 fn find_bundled_cli() -> Option<std::path::PathBuf> {
+    let bin_name = if cfg!(windows) { "cloak.exe" } else { "cloak" };
+
     if let Ok(current_exe) = std::env::current_exe() {
-        if let Some(macos_dir) = current_exe.parent() {
-            // Check direct sibling in MacOS directory
-            let sibling = macos_dir.join("cloak");
+        if let Some(exe_dir) = current_exe.parent() {
+            // Check direct sibling in executable directory
+            let sibling = exe_dir.join(bin_name);
             if sibling.is_file() {
                 return Some(sibling);
             }
 
-            // Check Resources directory inside bundle
-            if let Some(contents_dir) = macos_dir.parent() {
+            // Check Resources directory inside bundle or parent directory
+            if let Some(contents_dir) = exe_dir.parent() {
                 let resources_dir = contents_dir.join("Resources");
-                let candidate1 = resources_dir.join("cloak");
+                let candidate1 = resources_dir.join(bin_name);
                 if candidate1.is_file() {
                     return Some(candidate1);
                 }
-                let candidate2 = resources_dir.join("bin").join("cloak");
+                let candidate2 = resources_dir.join("bin").join(bin_name);
                 if candidate2.is_file() {
                     return Some(candidate2);
                 }
-                let candidate3 = resources_dir.join("target").join("release").join("cloak");
+                let candidate3 = resources_dir.join("target").join("release").join(bin_name);
                 if candidate3.is_file() {
                     return Some(candidate3);
                 }
@@ -691,19 +693,22 @@ fn find_bundled_cli() -> Option<std::path::PathBuf> {
         }
     }
 
-    // Check fixed /Applications bundle path
-    let app_bundle_cli = std::path::PathBuf::from("/Applications/Cloak.app/Contents/Resources/cloak");
-    if app_bundle_cli.is_file() {
-        return Some(app_bundle_cli);
-    }
-    let app_bundle_macos = std::path::PathBuf::from("/Applications/Cloak.app/Contents/MacOS/cloak");
-    if app_bundle_macos.is_file() {
-        return Some(app_bundle_macos);
+    // Check fixed /Applications bundle path on macOS
+    #[cfg(target_os = "macos")]
+    {
+        let app_bundle_cli = std::path::PathBuf::from("/Applications/Cloak.app/Contents/Resources/cloak");
+        if app_bundle_cli.is_file() {
+            return Some(app_bundle_cli);
+        }
+        let app_bundle_macos = std::path::PathBuf::from("/Applications/Cloak.app/Contents/MacOS/cloak");
+        if app_bundle_macos.is_file() {
+            return Some(app_bundle_macos);
+        }
     }
 
-    // Dev fallback
-    if let Ok(home) = std::env::var("HOME") {
-        let cargo_bin = std::path::PathBuf::from(&home).join(".cargo/bin/cloak");
+    // Dev fallback via HOME or USERPROFILE
+    if let Ok(home) = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
+        let cargo_bin = std::path::PathBuf::from(&home).join(".cargo").join("bin").join(bin_name);
         if cargo_bin.is_file() {
             return Some(cargo_bin);
         }
@@ -713,23 +718,36 @@ fn find_bundled_cli() -> Option<std::path::PathBuf> {
 }
 
 fn determine_symlink_target() -> std::path::PathBuf {
-    // 1. Try /usr/local/bin if it exists or can be written to
-    let usr_local_bin = std::path::PathBuf::from("/usr/local/bin");
-    if usr_local_bin.exists() {
-        return usr_local_bin.join("cloak");
-    }
-
-    // 2. Try ~/.local/bin
-    if let Ok(home) = std::env::var("HOME") {
-        let home_path = std::path::PathBuf::from(home);
-        let local_bin = home_path.join(".local/bin");
-        let _ = std::fs::create_dir_all(&local_bin);
-        if local_bin.exists() {
-            return local_bin.join("cloak");
+    #[cfg(windows)]
+    {
+        if let Ok(userprofile) = std::env::var("USERPROFILE") {
+            let local_bin = std::path::PathBuf::from(userprofile).join(".cargo").join("bin");
+            let _ = std::fs::create_dir_all(&local_bin);
+            return local_bin.join("cloak.exe");
         }
+        return std::path::PathBuf::from("C:\\Windows\\System32\\cloak.exe");
     }
 
-    std::path::PathBuf::from("/usr/local/bin/cloak")
+    #[cfg(not(windows))]
+    {
+        // 1. Try /usr/local/bin if it exists or can be written to
+        let usr_local_bin = std::path::PathBuf::from("/usr/local/bin");
+        if usr_local_bin.exists() {
+            return usr_local_bin.join("cloak");
+        }
+
+        // 2. Try ~/.local/bin
+        if let Ok(home) = std::env::var("HOME") {
+            let home_path = std::path::PathBuf::from(home);
+            let local_bin = home_path.join(".local/bin");
+            let _ = std::fs::create_dir_all(&local_bin);
+            if local_bin.exists() {
+                return local_bin.join("cloak");
+            }
+        }
+
+        std::path::PathBuf::from("/usr/local/bin/cloak")
+    }
 }
 
 fn ensure_cli_symlink() -> CliStatusDto {
@@ -1005,7 +1023,8 @@ mod tests {
     #[test]
     fn test_determine_symlink_target() {
         let target = determine_symlink_target();
-        assert!(target.ends_with("cloak"));
+        let target_str = target.to_string_lossy();
+        assert!(target_str.ends_with("cloak") || target_str.ends_with("cloak.exe"));
     }
 
     #[test]

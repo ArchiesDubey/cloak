@@ -41,7 +41,7 @@ assert_contains() {
 echo ""
 echo ">>> [1/7] Testing CLI Basic Commands & Binary Integrity..."
 VERSION_OUT=$(cloak --version)
-assert_contains "CLI Version Check" "cloak 0.5.1" "$VERSION_OUT"
+assert_contains "CLI Version Check" "cloak 0.5.2" "$VERSION_OUT"
 
 HELP_OUT=$(cloak --help)
 assert_contains "Help includes proxy subcommand" "proxy" "$HELP_OUT"

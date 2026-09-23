@@ -29,15 +29,11 @@ cargo build --release
 cp target/release/cloak ~/.cargo/bin/
 ```
 
-### Pre-built macOS App (.dmg)
-Download `Cloak.dmg` from Releases and drag `Cloak.app` to `/Applications`.
+### Pre-built Desktop App
+- **macOS (.dmg)**: Download `Cloak.dmg` from Releases and drag `Cloak.app` to `/Applications`. On first launch of unsigned builds, run `xattr -cr /Applications/Cloak.app`.
+- **Windows (.msi / .exe)**: Download and run the `Cloak_x64_en-US.msi` installer or NSIS setup from Releases.
 
-On first launch of community builds, grant Gatekeeper permission:
-```bash
-xattr -cr /Applications/Cloak.app
-```
-
-Opening `Cloak.app` automatically links the `cloak` CLI to `/usr/local/bin/cloak` and configures all installed AI agents.
+Opening the desktop app automatically connects your CLI and configures rules across installed AI agents.
 
 ---
 

@@ -63,9 +63,14 @@ jobs:
       matrix:
         include:
           - platform: "macos-latest"
+            target: "aarch64-apple-darwin"
             args: "--target aarch64-apple-darwin"
           - platform: "macos-13"
+            target: "x86_64-apple-darwin"
             args: "--target x86_64-apple-darwin"
+          - platform: "windows-latest"
+            target: "x86_64-pc-windows-msvc"
+            args: "--target x86_64-pc-windows-msvc"
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -87,21 +92,32 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || matrix.platform == 'macos-13' && 'x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.target }}
 
       - name: Install frontend dependencies
         working-directory: ./gui
         run: pnpm install --frozen-lockfile
 
-      - name: Build CLI Binary for Self-Contained Bundle
+      - name: Build CLI Binary for Self-Contained Bundle (Unix)
+        if: runner.os != 'Windows'
         run: |
           cargo build --release ${{ matrix.args }}
           mkdir -p target/release
-          if [ -f "target/aarch64-apple-darwin/release/cloak" ]; then
-            cp target/aarch64-apple-darwin/release/cloak target/release/cloak
-          elif [ -f "target/x86_64-apple-darwin/release/cloak" ]; then
-            cp target/x86_64-apple-darwin/release/cloak target/release/cloak
+          if [ -f "target/${{ matrix.target }}/release/cloak" ]; then
+            cp "target/${{ matrix.target }}/release/cloak" target/release/cloak
           fi
+          touch target/release/cloak.exe
+
+      - name: Build CLI Binary for Self-Contained Bundle (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cargo build --release ${{ matrix.args }}
+          mkdir -p target/release
+          if [ -f "target/${{ matrix.target }}/release/cloak.exe" ]; then
+            cp "target/${{ matrix.target }}/release/cloak.exe" target/release/cloak.exe
+          fi
+          touch target/release/cloak
 
       - name: Build Tauri Desktop App & Bundles
         uses: tauri-apps/tauri-action@v0
@@ -113,7 +129,7 @@ jobs:
           projectPath: "./gui"
           tagName: ${{ github.ref_name }}
           releaseName: "Cloak v__VERSION__"
-          releaseBody: "Cloak developer release for macOS (Apple Silicon and Intel)."
+          releaseBody: "Cloak release for macOS (Apple Silicon / Intel) and Windows (x86_64)."
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

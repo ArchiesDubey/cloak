@@ -7,3 +7,6 @@ dist/
 .DS_Store
 *.enc
 .env*
+videos/
+*.mp4
+*.mp3

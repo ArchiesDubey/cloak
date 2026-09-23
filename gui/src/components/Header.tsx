@@ -37,7 +37,7 @@ export const Header: React.FC<HeaderProps> = ({
                 [ CLOAK ]
               </span>
               <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-inset text-radar-glow border border-white/5 font-semibold">
-                v0.5.1
+                v0.5.2
               </span>
             </div>
             <span className="text-[9px] font-mono text-gray-400 leading-none">
@@ -60,7 +60,7 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="text-[10px] font-mono text-gray-300">
             {securityStatus.isUnlocked ? (
               <span className="text-gray-300 group-hover:text-radar-glow">
-                [TOUCH-ID: <span className="text-radar-core font-bold">UNLOCKED</span>]
+                [{securityStatus.biometricType.toUpperCase().includes('WINDOWS') ? 'WIN-HELLO' : 'VAULT'}: <span className="text-radar-core font-bold">UNLOCKED</span>]
               </span>
             ) : (
               <span className="text-red-400 font-bold">[VAULT: LOCKED]</span>

@@ -40,7 +40,7 @@ When any command, script, tool, or task requires an API key, credential, or secr
 /// Returns a vector of tuples: (file_path, was_created_or_appended)
 pub fn ensure_agent_rules() -> Vec<(String, bool)> {
     let mut results = Vec::new();
-    let home = match std::env::var("HOME") {
+    let home = match std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
         Ok(h) => PathBuf::from(h),
         Err(_) => return results,
     };
