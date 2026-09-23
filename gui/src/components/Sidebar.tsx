@@ -66,9 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div>
         <div className="p-4 border-b border-border-subtle flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center border border-border-subtle text-white">
-              <KeyRound className="w-3.5 h-3.5 text-zinc-300" />
-            </div>
+            <img src="/icon.png" alt="Cloak Logo" className="w-7 h-7 rounded-lg border border-border-subtle shadow-sm object-cover" />
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="font-semibold text-sm tracking-tight text-white">Cloak</span>

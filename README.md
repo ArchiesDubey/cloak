@@ -1,6 +1,21 @@
-# Cloak
+<p align="center">
+  <img src="gui/src-tauri/icons/128x128@2x.png" width="96" height="96" alt="Cloak Logo" />
+</p>
 
-Local-first secrets manager and process runtime. Cloak keeps API keys and tokens out of plaintext `.env` files and shell history by storing them in your OS keyring (or an encrypted vault file) and injecting them directly into process memory on demand.
+<h1 align="center">Cloak</h1>
+
+<p align="center">
+  <strong>Local-first secrets manager and process runtime.</strong><br>
+  Zero-leak process memory injection, OS keychain encryption, and dynamic HTTPS proxying for developers and AI agents.
+</p>
+
+<p align="center">
+  <a href="https://github.com/ArchiesDubey/cloak/releases"><img src="https://img.shields.io/github/v/release/ArchiesDubey/cloak?color=orange&label=Release" alt="Release" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License" /></a>
+  <a href="https://github.com/ArchiesDubey/cloak/actions"><img src="https://img.shields.io/github/actions/workflow/status/ArchiesDubey/cloak/test.yml?branch=master&label=CI" alt="CI Status" /></a>
+</p>
+
+Cloak keeps API keys and tokens out of plaintext `.env` files and shell history by storing them in your OS keyring (or an encrypted vault file) and injecting them directly into process memory on demand.
 
 It also includes a local loopback proxy that dynamically decrypts and injects credentials for outbound AI agent requests in memory, without giving tools or scripts access to raw keys.
 
