@@ -880,6 +880,7 @@ fn main() {
     let store = KeyringStore::new().expect("Failed to initialize Keyring store");
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|_app| {
             // Self-contained .dmg: automatically install/verify CLI symlink & agent rules on startup
             let _ = ensure_cli_symlink();

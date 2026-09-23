@@ -181,7 +181,7 @@ describe('GUI Component Tests: Cloak Minimal Desktop', () => {
     );
 
     expect(screen.getByText('Cloak')).toBeInTheDocument();
-    expect(screen.getByText('v0.5.2')).toBeInTheDocument();
+    expect(screen.getByText('v0.6.0')).toBeInTheDocument();
     expect(screen.getByText('All Secrets')).toBeInTheDocument();
     expect(screen.getByText('Global (Keychain)')).toBeInTheDocument();
     expect(screen.getByText('cloak-core')).toBeInTheDocument();

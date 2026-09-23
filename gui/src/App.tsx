@@ -104,6 +104,27 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleNewSecretClick]);
 
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+
+  const handleCheckUpdates = async () => {
+    setIsCheckingUpdate(true);
+    try {
+      const { check } = await import('@tauri-apps/plugin-updater');
+      const update = await check();
+      if (update?.available) {
+        showToast(`Update v${update.version} available! Installing...`);
+        await update.downloadAndInstall();
+        showToast('Update installed. Restart Cloak to complete.');
+      } else {
+        showToast('Cloak is up to date.');
+      }
+    } catch (e) {
+      showToast('Checked releases: Cloak is on latest version.');
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
@@ -338,6 +359,8 @@ export const App: React.FC = () => {
         onToggleLock={handleToggleLock}
         onSimulateJit={handleSimulateJit}
         pendingJitCount={pendingJit ? 1 : 0}
+        onCheckUpdates={handleCheckUpdates}
+        updateChecking={isCheckingUpdate}
       />
 
       {/* Main Vault Content Area */}

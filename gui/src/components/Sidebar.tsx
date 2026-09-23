@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, ShieldAlert, KeyRound, Globe, FolderGit2, Sparkles } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, KeyRound, Globe, FolderGit2, Sparkles, RefreshCw } from 'lucide-react';
 import { ScopeFilter, ProxyStatus, SecurityStatus } from '../types';
 
 interface SidebarProps {
@@ -19,6 +19,8 @@ interface SidebarProps {
   onToggleLock: () => void;
   onSimulateJit: () => void;
   pendingJitCount: number;
+  onCheckUpdates?: () => void;
+  updateChecking?: boolean;
 }
 
 // Burnrate-inspired StatusRing: 3/4 animated circle at 1.4s period
@@ -59,6 +61,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleLock,
   onSimulateJit,
   pendingJitCount,
+  onCheckUpdates,
+  updateChecking,
 }) => {
   return (
     <aside className="w-56 bg-sidebar border-r border-border-subtle flex flex-col justify-between select-none flex-shrink-0">
@@ -71,7 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="flex items-center gap-1.5">
                 <span className="font-semibold text-sm tracking-tight text-white">Cloak</span>
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface border border-border-subtle text-[#808080] font-mono">
-                  v0.5.2
+                  v0.6.0
                 </span>
               </div>
             </div>
@@ -208,6 +212,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {proxyStatus.running ? 'Running' : 'Off'}
           </span>
         </button>
+
+        {/* Check for Updates button */}
+        {onCheckUpdates && (
+          <button
+            onClick={onCheckUpdates}
+            disabled={updateChecking}
+            className="w-full flex items-center justify-between py-1.5 px-2 rounded-md text-[11px] text-[#808080] hover:text-white hover:bg-surface-hover transition-colors cursor-pointer disabled:opacity-50"
+            title="Check GitHub for Cloak updates"
+          >
+            <div className="flex items-center gap-1.5">
+              <RefreshCw className={`w-3 h-3 text-[#808080] ${updateChecking ? 'animate-spin' : ''}`} />
+              <span>{updateChecking ? 'Checking...' : 'Check Updates'}</span>
+            </div>
+          </button>
+        )}
 
         {/* Optional Simulate JIT Button for Testing */}
         <button

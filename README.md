@@ -21,17 +21,19 @@ It also includes a local loopback proxy that dynamically decrypts and injects cr
 
 ---
 
-### Download Desktop App & CLI
+### Download Desktop App & CLI (v0.6.0)
 
-Pre-built binaries are available on the [Latest GitHub Release](https://github.com/ArchiesDubey/cloak/releases/latest):
+Pre-built releases for macOS and Windows are available on [GitHub Releases](https://github.com/ArchiesDubey/cloak/releases/latest):
 
 | Platform | Package | Architecture | Direct Download |
 | :--- | :--- | :--- | :--- |
-| **macOS** | Disk Image (`.dmg`) | Apple Silicon (M1/M2/M3/M4) | [**Cloak_aarch64.dmg**](https://github.com/ArchiesDubey/cloak/releases/latest/download/Cloak_aarch64.dmg) |
-| **macOS** | Disk Image (`.dmg`) | Intel (x86_64) | [**Cloak_x64.dmg**](https://github.com/ArchiesDubey/cloak/releases/latest/download/Cloak_x64.dmg) |
-| **Windows** | Windows Installer (`.msi`) | 64-bit (x86_64) | [**Cloak_x64_en-US.msi**](https://github.com/ArchiesDubey/cloak/releases/latest/download/Cloak_x64_en-US.msi) |
-| **Windows** | Setup Executable (`.exe`) | 64-bit (NSIS) | [**Cloak_x64-setup.exe**](https://github.com/ArchiesDubey/cloak/releases/latest/download/Cloak_x64-setup.exe) |
+| **macOS** | Disk Image (`.dmg`) | Apple Silicon (M1/M2/M3/M4) | [**`Cloak_aarch64.dmg`**](https://github.com/ArchiesDubey/cloak/releases/latest/download/Cloak_aarch64.dmg) |
+| **macOS** | Disk Image (`.dmg`) | Intel (x86_64) | [**`Cloak_x64.dmg`**](https://github.com/ArchiesDubey/cloak/releases/latest/download/Cloak_x64.dmg) |
+| **Windows** | Windows Installer (`.msi`) | 64-bit (x86_64) | [**`Cloak_x64_en-US.msi`**](https://github.com/ArchiesDubey/cloak/releases/latest/download/Cloak_x64_en-US.msi) |
+| **Windows** | Setup Executable (`.exe`) | 64-bit (NSIS) | [**`Cloak_x64-setup.exe`**](https://github.com/ArchiesDubey/cloak/releases/latest/download/Cloak_x64-setup.exe) |
 
+> **In-App Auto Updates**: Cloak includes built-in auto-updates. Once installed, future updates can be checked and applied directly in the app without losing any credentials or settings.
+>
 > **macOS first launch note**: If prompted by Gatekeeper on unsigned community builds, run:
 > ```bash
 > xattr -cr /Applications/Cloak.app
