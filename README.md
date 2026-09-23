@@ -21,19 +21,29 @@ It also includes a local loopback proxy that dynamically decrypts and injects cr
 
 ---
 
-## Quickstart
+### Download Desktop App & CLI
 
-### Build and Install CLI
+Pre-built binaries are available on the [Latest GitHub Release](https://github.com/ArchiesDubey/cloak/releases/latest):
+
+| Platform | Package | Architecture | Direct Download |
+| :--- | :--- | :--- | :--- |
+| **macOS** | Disk Image (`.dmg`) | Apple Silicon (M1/M2/M3/M4) | [**Cloak_aarch64.dmg**](https://github.com/ArchiesDubey/cloak/releases/latest/download/Cloak_aarch64.dmg) |
+| **macOS** | Disk Image (`.dmg`) | Intel (x86_64) | [**Cloak_x64.dmg**](https://github.com/ArchiesDubey/cloak/releases/latest/download/Cloak_x64.dmg) |
+| **Windows** | Windows Installer (`.msi`) | 64-bit (x86_64) | [**Cloak_x64_en-US.msi**](https://github.com/ArchiesDubey/cloak/releases/latest/download/Cloak_x64_en-US.msi) |
+| **Windows** | Setup Executable (`.exe`) | 64-bit (NSIS) | [**Cloak_x64-setup.exe**](https://github.com/ArchiesDubey/cloak/releases/latest/download/Cloak_x64-setup.exe) |
+
+> **macOS first launch note**: If prompted by Gatekeeper on unsigned community builds, run:
+> ```bash
+> xattr -cr /Applications/Cloak.app
+> ```
+
+Opening the desktop app automatically connects your CLI and configures rules across installed AI agents.
+
+### Or Build CLI from Source
 ```bash
 cargo build --release
 cp target/release/cloak ~/.cargo/bin/
 ```
-
-### Pre-built Desktop App
-- **macOS (.dmg)**: Download `Cloak.dmg` from Releases and drag `Cloak.app` to `/Applications`. On first launch of unsigned builds, run `xattr -cr /Applications/Cloak.app`.
-- **Windows (.msi / .exe)**: Download and run the `Cloak_x64_en-US.msi` installer or NSIS setup from Releases.
-
-Opening the desktop app automatically connects your CLI and configures rules across installed AI agents.
 
 ---
 
