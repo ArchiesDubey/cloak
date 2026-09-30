@@ -14,6 +14,7 @@
     "windows": [
       {
         "title": "Cloak",
+        "url": "index.html",
         "width": 920,
         "height": 620,
         "minWidth": 720,
@@ -26,7 +27,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' tauri: asset:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost blob: data:"
+      "csp": "default-src 'self' tauri: asset:; script-src 'self' 'unsafe-inline' tauri: asset:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost blob: data:"
     }
   },
   "bundle": {
@@ -50,13 +51,6 @@
       "digestAlgorithm": "sha256",
       "timestampUrl": ""
     }
-  },
-  "plugins": {
-    "updater": {
-      "endpoints": [
-        "https://github.com/ArchiesDubey/cloak/releases/latest/download/latest.json"
-      ],
-      "pubkey": ""
-    }
   }
 }
+
