@@ -1068,23 +1068,35 @@ async fn main() -> Result<std::process::ExitCode> {
 
         Commands::Gui => {
             println!("🚀 Launching Cloak Hybrid HUD desktop app...");
-            let sibling_gui = std::env::current_exe()
-                .ok()
-                .and_then(|p| p.parent().map(|d| d.join("cloak-gui")));
-            let app_bundle_gui =
-                std::path::PathBuf::from("/Applications/Cloak.app/Contents/MacOS/cloak-gui");
-            let status = if let Some(ref path) = sibling_gui.filter(|p| p.exists()) {
-                std::process::Command::new(path).spawn()
-            } else if app_bundle_gui.exists() {
-                std::process::Command::new(app_bundle_gui).spawn()
-            } else {
-                std::process::Command::new("cloak-gui")
-                    .spawn()
-                    .or_else(|_| {
-                        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-                        let path = format!("{}/.cargo/bin/cloak-gui", home);
+            #[cfg(target_os = "macos")]
+            let status = {
+                let app_bundle = std::path::Path::new("/Applications/Cloak.app");
+                if app_bundle.exists() {
+                    std::process::Command::new("open")
+                        .arg("/Applications/Cloak.app")
+                        .spawn()
+                } else {
+                    let sibling_gui = std::env::current_exe()
+                        .ok()
+                        .and_then(|p| p.parent().map(|d| d.join("cloak-gui")));
+                    if let Some(ref path) = sibling_gui.filter(|p| p.exists()) {
                         std::process::Command::new(path).spawn()
-                    })
+                    } else {
+                        std::process::Command::new("cloak-gui").spawn()
+                    }
+                }
+            };
+
+            #[cfg(not(target_os = "macos"))]
+            let status = {
+                let sibling_gui = std::env::current_exe()
+                    .ok()
+                    .and_then(|p| p.parent().map(|d| d.join("cloak-gui")));
+                if let Some(ref path) = sibling_gui.filter(|p| p.exists()) {
+                    std::process::Command::new(path).spawn()
+                } else {
+                    std::process::Command::new("cloak-gui").spawn()
+                }
             };
 
             match status {
