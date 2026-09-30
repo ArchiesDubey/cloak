@@ -15,7 +15,7 @@ use std::io::IsTerminal;
 use std::path::PathBuf;
 use storage::file_store::FileStore;
 use storage::keyring_store::KeyringStore;
-use storage::SecretStore;
+use storage::{SecretMetadata, SecretStore};
 
 use zeroize::Zeroizing;
 
@@ -104,6 +104,30 @@ enum Commands {
         /// Secret key name to delete
         key: String,
     },
+    /// Rotate an existing secret, automatically archiving previous value for rollback
+    Rotate {
+        /// Secret key name to rotate (e.g. OPENAI_API_KEY)
+        key: String,
+        /// New secret value. If omitted, prompts securely without echoing.
+        value: Option<String>,
+        /// Verify the new key against upstream provider endpoints before committing
+        #[arg(long)]
+        verify: bool,
+        /// Rollback the secret to its previously stored value
+        #[arg(long)]
+        rollback: bool,
+    },
+    /// Audit stored secrets for rotation staleness, security tiers, and age
+    Audit {
+        /// Audit all projects and global secrets machine-wide
+        #[arg(long)]
+        all: bool,
+        /// Rotation age threshold in days for marking secrets as stale (defaults to 90 days)
+        #[arg(long, default_value_t = 90)]
+        days: u64,
+    },
+    /// Rekey the standalone encrypted file vault with a new passphrase (Argon2id + XChaCha20-Poly1305)
+    Rekey,
     /// Execute a command with secrets injected into the child process environment
     Run {
         /// Specific keys to inject (comma-separated or repeated). Defaults to all keys in scope.
@@ -145,6 +169,10 @@ enum Commands {
         /// Output shell export commands for current environment (eval $(cloak proxy --env))
         #[arg(long)]
         env: bool,
+
+        /// Rotate the proxy session authentication token (CLOAK_PROXY_TOKEN)
+        #[arg(long = "rotate-token")]
+        rotate_token: bool,
     },
     /// Manage the local Cloak Certificate Authority (CA) for HTTPS interception
     Ca {
@@ -163,6 +191,8 @@ enum CaCommands {
     Install,
     /// Print the path to the Cloak Root CA certificate (~/.cloak/ca.pem)
     Path,
+    /// Rotate the local Cloak Root CA certificate and key
+    Rotate,
 }
 
 fn get_store(backend: StoreBackend, custom_vault: Option<PathBuf>) -> Result<Box<dyn SecretStore>> {
@@ -206,6 +236,197 @@ fn mask_secret(value: &str) -> String {
         let prefix: String = value.chars().take(4).collect();
         let suffix: String = value.chars().skip(count.saturating_sub(4)).collect();
         format!("{}••••••••{}", prefix, suffix)
+    }
+}
+
+fn format_age(timestamp: u64) -> String {
+    if timestamp == 0 {
+        return "age unknown".to_string();
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    if now <= timestamp {
+        return "just now".to_string();
+    }
+    let diff = now - timestamp;
+    let days = diff / 86400;
+    if days == 0 {
+        let hours = diff / 3600;
+        if hours == 0 {
+            let mins = diff / 60;
+            format!("{}m ago", mins)
+        } else {
+            format!("{}h ago", hours)
+        }
+    } else {
+        format!("{}d ago", days)
+    }
+}
+
+fn format_key_line(store: &dyn SecretStore, ns: &str, k: &str, prefix: &str) -> String {
+    let tier = if store.is_hardware_protected(ns, k) {
+        " [Touch ID Enclave]"
+    } else {
+        ""
+    };
+    let meta_str = if let Ok(Some(meta)) = store.get_metadata(ns, k) {
+        let ts = if meta.last_rotated_at > 0 {
+            meta.last_rotated_at
+        } else {
+            meta.created_at
+        };
+        let age = format_age(ts);
+        let rb = if meta.has_rollback {
+            " [rollback available]"
+        } else {
+            ""
+        };
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let is_stale = ts > 0 && (now.saturating_sub(ts)) >= 90 * 86400;
+        if is_stale {
+            format!(" (rotated {} - ⚠️ STALE){}", age, rb)
+        } else if ts > 0 {
+            format!(" (rotated {}){}", age, rb)
+        } else {
+            rb.to_string()
+        }
+    } else {
+        String::new()
+    };
+    format!("{}{}{}{}", prefix, k, tier, meta_str)
+}
+
+async fn verify_secret_upstream(key: &str, value: &str) -> Result<bool> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()?;
+
+    let key_upper = key.to_uppercase();
+
+    if key_upper.contains("OPENAI")
+        || value.starts_with("sk-proj-")
+        || (value.starts_with("sk-") && !value.starts_with("sk-ant-"))
+    {
+        eprintln!("🔍 [Verify] Probing OpenAI endpoint https://api.openai.com/v1/models...");
+        let res = client
+            .get("https://api.openai.com/v1/models")
+            .header("Authorization", format!("Bearer {}", value.trim()))
+            .send()
+            .await;
+        match res {
+            Ok(r) if r.status().is_success() => {
+                eprintln!("✓ Upstream verification succeeded: Valid OpenAI key.");
+                Ok(true)
+            }
+            Ok(r) if r.status() == reqwest::StatusCode::UNAUTHORIZED => {
+                eprintln!("❌ Upstream verification failed: OpenAI returned 401 Unauthorized.");
+                Ok(false)
+            }
+            Ok(r) => {
+                eprintln!(
+                    "⚠️  Upstream returned status {}: proceeding with caution.",
+                    r.status()
+                );
+                Ok(true)
+            }
+            Err(e) => {
+                eprintln!("⚠️  Network probe error ({e}): skipping verification check.");
+                Ok(true)
+            }
+        }
+    } else if key_upper.contains("ANTHROPIC") || value.starts_with("sk-ant-") {
+        eprintln!("🔍 [Verify] Probing Anthropic endpoint https://api.anthropic.com/v1/messages...");
+        let res = client
+            .post("https://api.anthropic.com/v1/messages")
+            .header("x-api-key", value.trim())
+            .header("anthropic-version", "2023-06-01")
+            .header("content-type", "application/json")
+            .body(r#"{"model":"claude-3-haiku-20240307","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}"#)
+            .send()
+            .await;
+        match res {
+            Ok(r) if r.status().is_success() || r.status() == reqwest::StatusCode::BAD_REQUEST => {
+                eprintln!("✓ Upstream verification succeeded: Valid Anthropic key.");
+                Ok(true)
+            }
+            Ok(r)
+                if r.status() == reqwest::StatusCode::UNAUTHORIZED
+                    || r.status() == reqwest::StatusCode::FORBIDDEN =>
+            {
+                eprintln!(
+                    "❌ Upstream verification failed: Anthropic returned {}.",
+                    r.status()
+                );
+                Ok(false)
+            }
+            Ok(r) => {
+                eprintln!(
+                    "⚠️  Upstream returned status {}: proceeding with caution.",
+                    r.status()
+                );
+                Ok(true)
+            }
+            Err(e) => {
+                eprintln!("⚠️  Network probe error ({e}): skipping verification check.");
+                Ok(true)
+            }
+        }
+    } else if key_upper.contains("GITHUB")
+        || value.starts_with("ghp_")
+        || value.starts_with("github_pat_")
+    {
+        eprintln!("🔍 [Verify] Probing GitHub endpoint https://api.github.com/user...");
+        let res = client
+            .get("https://api.github.com/user")
+            .header("Authorization", format!("Bearer {}", value.trim()))
+            .header("User-Agent", "cloak-key-verifier")
+            .send()
+            .await;
+        match res {
+            Ok(r) if r.status().is_success() => {
+                eprintln!("✓ Upstream verification succeeded: Valid GitHub token.");
+                Ok(true)
+            }
+            Ok(r) if r.status() == reqwest::StatusCode::UNAUTHORIZED => {
+                eprintln!("❌ Upstream verification failed: GitHub returned 401 Unauthorized.");
+                Ok(false)
+            }
+            Ok(_) => Ok(true),
+            Err(_) => Ok(true),
+        }
+    } else if key_upper.contains("STRIPE")
+        || value.starts_with("sk_live_")
+        || value.starts_with("sk_test_")
+    {
+        eprintln!("🔍 [Verify] Probing Stripe endpoint https://api.stripe.com/v1/balance...");
+        let res = client
+            .get("https://api.stripe.com/v1/balance")
+            .header("Authorization", format!("Bearer {}", value.trim()))
+            .send()
+            .await;
+        match res {
+            Ok(r) if r.status().is_success() => {
+                eprintln!("✓ Upstream verification succeeded: Valid Stripe key.");
+                Ok(true)
+            }
+            Ok(r) if r.status() == reqwest::StatusCode::UNAUTHORIZED => {
+                eprintln!("❌ Upstream verification failed: Stripe returned 401 Unauthorized.");
+                Ok(false)
+            }
+            Ok(_) => Ok(true),
+            Err(_) => Ok(true),
+        }
+    } else {
+        eprintln!(
+            "ℹ️  No provider-specific probe recognized for '{}'. Skipping verification.",
+            key
+        );
+        Ok(true)
     }
 }
 
@@ -318,7 +539,7 @@ async fn main() -> Result<std::process::ExitCode> {
         return Ok(std::process::ExitCode::SUCCESS);
     }
 
-    let store = get_store(cli.store, cli.vault_path)?;
+    let mut store = get_store(cli.store, cli.vault_path)?;
     let target_scope = resolve_target_scope(cli.global, cli.project.as_deref());
 
     match cli.command {
@@ -406,12 +627,7 @@ async fn main() -> Result<std::process::ExitCode> {
                         println!("    (no secrets)");
                     } else {
                         for k in keys {
-                            let tier = if store.is_hardware_protected(&ns, &k) {
-                                " [Touch ID Enclave]"
-                            } else {
-                                ""
-                            };
-                            println!("    • {}{}", k, tier);
+                            println!("{}", format_key_line(store.as_ref(), &ns, &k, "    • "));
                         }
                     }
                 }
@@ -424,12 +640,7 @@ async fn main() -> Result<std::process::ExitCode> {
                             println!("  (no global secrets found)");
                         } else {
                             for k in keys {
-                                let tier = if store.is_hardware_protected(GLOBAL_NAMESPACE, &k) {
-                                    " [Touch ID Enclave]"
-                                } else {
-                                    ""
-                                };
-                                println!("  • {}{}", k, tier);
+                                println!("{}", format_key_line(store.as_ref(), GLOBAL_NAMESPACE, &k, "  • "));
                             }
                         }
                     }
@@ -443,12 +654,7 @@ async fn main() -> Result<std::process::ExitCode> {
                             println!("  (no project-specific secrets)");
                         } else {
                             for k in project_keys {
-                                let tier = if store.is_hardware_protected(&ns, &k) {
-                                    " [Touch ID Enclave]"
-                                } else {
-                                    ""
-                                };
-                                println!("  • {}{}", k, tier);
+                                println!("{}", format_key_line(store.as_ref(), &ns, &k, "  • "));
                             }
                         }
 
@@ -457,12 +663,7 @@ async fn main() -> Result<std::process::ExitCode> {
                             println!("  (none)");
                         } else {
                             for k in global_keys {
-                                let tier = if store.is_hardware_protected(GLOBAL_NAMESPACE, &k) {
-                                    " [Touch ID Enclave]"
-                                } else {
-                                    ""
-                                };
-                                println!("  • {}{}", k, tier);
+                                println!("{}", format_key_line(store.as_ref(), GLOBAL_NAMESPACE, &k, "  • "));
                             }
                         }
                     }
@@ -481,6 +682,187 @@ async fn main() -> Result<std::process::ExitCode> {
                     println!("✓ Secret '{}' deleted from project '{}'", key, name);
                 }
             }
+        }
+
+        Commands::Rotate {
+            key,
+            value,
+            verify,
+            rollback,
+        } => {
+            let ns = scope_to_namespace(&target_scope);
+            if rollback {
+                match store.rollback(&ns, &key)? {
+                    Some(_) => {
+                        println!(
+                            "✓ Rolled back secret '{}' in scope '{}' to its previous value.",
+                            key, ns
+                        );
+                    }
+                    None => {
+                        bail!(
+                            "No previous rollback version found for secret '{}' in scope '{}'.",
+                            key,
+                            ns
+                        );
+                    }
+                }
+            } else {
+                let new_val = match value {
+                    Some(v) => v,
+                    None => rpassword::prompt_password(format!("Enter new value for '{}': ", key))
+                        .context("Failed to read masked secret value")?,
+                };
+
+                if new_val.trim().is_empty() {
+                    bail!("Secret value cannot be empty.");
+                }
+
+                if verify {
+                    let ok = verify_secret_upstream(&key, &new_val).await?;
+                    if !ok {
+                        bail!("Aborting rotation: new secret failed upstream verification probe.");
+                    }
+                }
+
+                store.rotate(&ns, &key, &new_val)?;
+                println!(
+                    "✓ Secret '{}' successfully rotated in scope '{}' (previous value archived for rollback).",
+                    key, ns
+                );
+            }
+        }
+
+        Commands::Audit { all, days } => {
+            let threshold_secs = days * 86400;
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+
+            let namespaces = if all {
+                store.list_namespaces()?
+            } else {
+                vec![scope_to_namespace(&target_scope)]
+            };
+
+            let mut total_keys: usize = 0;
+            let mut stale_keys: usize = 0;
+            let mut hw_keys: usize = 0;
+            let mut rollback_ready: usize = 0;
+
+            println!("🛡️  Cloak Secret Security & Rotation Audit (Threshold: {} days)\n", days);
+
+            for ns in &namespaces {
+                let keys = store.list(ns)?;
+                if keys.is_empty() {
+                    continue;
+                }
+                let label = if ns == GLOBAL_NAMESPACE {
+                    "🌐 Global Scope".to_string()
+                } else if let Some(p) = ns.strip_prefix("proj-") {
+                    format!("📁 Project Scope: {}", p)
+                } else {
+                    format!("Scope: {}", ns)
+                };
+                println!("{}", label);
+
+                for k in &keys {
+                    total_keys += 1;
+                    let is_hw = store.is_hardware_protected(ns, k);
+                    if is_hw {
+                        hw_keys += 1;
+                    }
+                    let meta = store.get_metadata(ns, k)?.unwrap_or(SecretMetadata {
+                        hardware_protected: is_hw,
+                        created_at: 0,
+                        last_rotated_at: 0,
+                        has_rollback: false,
+                    });
+
+                    if meta.has_rollback {
+                        rollback_ready += 1;
+                    }
+
+                    let ref_time = if meta.last_rotated_at > 0 {
+                        meta.last_rotated_at
+                    } else {
+                        meta.created_at
+                    };
+                    let age_str = format_age(ref_time);
+                    let is_stale = ref_time > 0 && (now.saturating_sub(ref_time) >= threshold_secs);
+
+                    let status_badge = if is_stale {
+                        stale_keys += 1;
+                        "⚠️  STALE"
+                    } else {
+                        "✓ HEALTHY"
+                    };
+
+                    let tier_label = if is_hw {
+                        "Hardware Enclave"
+                    } else {
+                        "Software Keyring"
+                    };
+
+                    let rb_label = if meta.has_rollback {
+                        "rollback available"
+                    } else {
+                        "no rollback"
+                    };
+
+                    println!(
+                        "  [{}] {:<24} Age: {:<10} Tier: {:<18} ({})",
+                        status_badge, k, age_str, tier_label, rb_label
+                    );
+                }
+                println!();
+            }
+
+            println!("─── Audit Summary ────────────────────────────────────────────");
+            println!("Total secrets:      {}", total_keys);
+            println!("Healthy secrets:    {}", total_keys.saturating_sub(stale_keys));
+            println!("Stale secrets:      {} (older than {} days)", stale_keys, days);
+            println!("Hardware-backed:    {}", hw_keys);
+            println!("Rollback available: {}", rollback_ready);
+            println!("──────────────────────────────────────────────────────────────");
+            if stale_keys > 0 {
+                println!("\nTip: Rotate stale secrets using 'cloak rotate <KEY>' to maintain hygiene.");
+            }
+        }
+
+        Commands::Rekey => {
+            if cli.store != StoreBackend::File {
+                bail!(
+                    "Rekeying is only applicable to standalone encrypted file vaults (--store file).\n\
+                     The OS Keyring backend is already hardware-backed or managed by your OS."
+                );
+            }
+
+            println!("🔐 Vault Rekeying (Argon2id + XChaCha20-Poly1305)");
+            println!("This will re-derive vault encryption keys with a fresh Argon2id salt and re-encrypt all stored secrets.\n");
+
+            let new_pass = if let Ok(pass) = std::env::var("CLOAK_NEW_MASTER_KEY") {
+                std::env::remove_var("CLOAK_NEW_MASTER_KEY");
+                pass
+            } else {
+                let p1 = rpassword::prompt_password("Enter NEW Master Vault Passphrase: ")
+                    .context("Failed to read new passphrase")?;
+                let p2 = rpassword::prompt_password("Confirm NEW Master Vault Passphrase: ")
+                    .context("Failed to confirm new passphrase")?;
+
+                if p1 != p2 {
+                    bail!("Passphrases do not match. Rekey aborted.");
+                }
+                p1
+            };
+
+            if new_pass.trim().is_empty() {
+                bail!("Passphrase cannot be empty. Rekey aborted.");
+            }
+
+            store.rekey(new_pass.as_bytes())?;
+            println!("\n✓ Vault successfully rekeyed with fresh Argon2id salt and re-encrypted.");
         }
 
         Commands::Run {
@@ -568,7 +950,45 @@ async fn main() -> Result<std::process::ExitCode> {
             }
         }
 
-        Commands::Proxy { port, stop, env } => {
+        Commands::Proxy {
+            port,
+            stop,
+            env,
+            rotate_token,
+        } => {
+            if rotate_token {
+                let port_to_check = proxy::active_proxy_port().unwrap_or(port);
+                let current_token = proxy::get_or_create_session_token().unwrap_or_default();
+                let client = reqwest::Client::builder()
+                    .no_proxy()
+                    .timeout(std::time::Duration::from_millis(1500))
+                    .build()
+                    .unwrap_or_default();
+                let url = format!("http://127.0.0.1:{}/cloak/token/rotate", port_to_check);
+                match client
+                    .post(&url)
+                    .header("Authorization", format!("Bearer {}", current_token))
+                    .send()
+                    .await
+                {
+                    Ok(res) if res.status().is_success() => {
+                        let json: serde_json::Value = res.json().await.unwrap_or_default();
+                        let new_token = json.get("token").and_then(|t| t.as_str()).unwrap_or("");
+                        println!(
+                            "✓ Successfully rotated proxy session token (active daemon on port {} updated).",
+                            port_to_check
+                        );
+                        println!("  New token: {}", new_token);
+                    }
+                    _ => {
+                        let new_token = proxy::rotate_session_token()?;
+                        println!("✓ Successfully rotated proxy session token in ~/.cloak/proxy.token.");
+                        println!("  New token: {}", new_token);
+                    }
+                }
+                return Ok(std::process::ExitCode::SUCCESS);
+            }
+
             if env {
                 let token = proxy::get_or_create_session_token()?;
                 println!("export OPENAI_BASE_URL=\"http://127.0.0.1:{}/v1\"", port);
@@ -636,6 +1056,13 @@ async fn main() -> Result<std::process::ExitCode> {
             CaCommands::Path => {
                 let path = proxy::ca::ca_cert_path()?;
                 println!("{}", path.display());
+            }
+            CaCommands::Rotate => {
+                proxy::ca::CertificateAuthority::rotate()?;
+                println!("✓ Successfully rotated local Cloak Certificate Authority (CA).");
+                println!("  Old certificate and private key backed up with timestamp in ~/.cloak/");
+                println!("  Fresh Root CA certificate generated at ~/.cloak/ca.pem");
+                println!("  Run 'cloak ca install' to trust the new Root CA certificate in your OS trust store.");
             }
         },
 

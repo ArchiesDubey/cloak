@@ -238,7 +238,66 @@ assert_eq "Proxy daemon stopped after /cloak/shutdown" "0" "$PROXY_RUNNING"
 assert_eq "proxy.info cleaned up after shutdown" "false" "$([[ -f ~/.cloak/proxy.info ]] && echo true || echo false)"
 
 echo ""
-echo ">>> [7/7] Testing GUI & Desktop App Assets..."
+echo ">>> [7/8] Testing 4-Pillar Key Rotation, Rollback, Stale Auditing & Rekeying..."
+# 1. Test secret rotation and rollback
+cloak set -g ROTATE_TEST_KEY "initial_version_111" > /dev/null
+VAL_INIT=$(cloak get -g ROTATE_TEST_KEY --reveal)
+assert_eq "Initial secret saved" "initial_version_111" "$VAL_INIT"
+
+cloak rotate -g ROTATE_TEST_KEY "rotated_version_222" > /dev/null
+VAL_ROTATED=$(cloak get -g ROTATE_TEST_KEY --reveal)
+assert_eq "Secret rotated to new value" "rotated_version_222" "$VAL_ROTATED"
+
+LIST_ROT_OUT=$(cloak list -g)
+assert_contains "List displays rollback availability" "rollback available" "$LIST_ROT_OUT"
+assert_contains "List displays rotation age" "rotated" "$LIST_ROT_OUT"
+
+# Rollback secret
+cloak rotate -g ROTATE_TEST_KEY --rollback > /dev/null
+VAL_ROLLED_BACK=$(cloak get -g ROTATE_TEST_KEY --reveal)
+assert_eq "Secret rolled back to previous version" "initial_version_111" "$VAL_ROLLED_BACK"
+
+# Clean up rotate test key
+cloak delete -g ROTATE_TEST_KEY > /dev/null 2>&1 || true
+
+# 2. Test audit command
+AUDIT_OUT=$(cloak audit --days 90)
+assert_contains "Audit output contains summary header" "Audit Summary" "$AUDIT_OUT"
+assert_contains "Audit output reports total secrets" "Total secrets:" "$AUDIT_OUT"
+assert_contains "Audit output reports healthy secrets" "Healthy secrets:" "$AUDIT_OUT"
+
+# 3. Test CA rotation
+CA_ROT_OUT=$(cloak ca rotate)
+assert_contains "CA rotation generates fresh certificate" "Successfully rotated local Cloak Certificate Authority" "$CA_ROT_OUT"
+assert_eq "Fresh CA cert exists at ~/.cloak/ca.pem" "true" "$([[ -f ~/.cloak/ca.pem ]] && echo true || echo false)"
+
+# 4. Test proxy session token rotation
+TOKEN_ROT_OUT=$(cloak proxy --rotate-token)
+assert_contains "Proxy session token rotated" "Successfully rotated proxy session token" "$TOKEN_ROT_OUT"
+NEW_TOKEN=$(cat ~/.cloak/proxy.token)
+assert_contains "Proxy token has valid length" "64" "${#NEW_TOKEN}"
+
+# 5. Test standalone encrypted file vault rekeying
+TEMP_REKEY_VAULT="/tmp/test_cloak_rekey_$$.enc"
+export CLOAK_MASTER_KEY="original-passphrase-99"
+cloak --store file --vault-path "$TEMP_REKEY_VAULT" set REKEY_KEY "payload_across_rekey" > /dev/null
+VAL_PRE_REKEY=$(cloak --store file --vault-path "$TEMP_REKEY_VAULT" get REKEY_KEY --reveal)
+export CLOAK_MASTER_KEY="original-passphrase-99"
+export CLOAK_NEW_MASTER_KEY="new-passphrase-88"
+cloak --store file --vault-path "$TEMP_REKEY_VAULT" rekey > /dev/null
+export CLOAK_MASTER_KEY="new-passphrase-88"
+VAL_POST_REKEY=$(cloak --store file --vault-path "$TEMP_REKEY_VAULT" get REKEY_KEY --reveal)
+assert_eq "Post-rekey secret decrypts with new passphrase" "payload_across_rekey" "$VAL_POST_REKEY"
+
+export CLOAK_MASTER_KEY="original-passphrase-99"
+OLD_KEY_EXIT=0
+cloak --store file --vault-path "$TEMP_REKEY_VAULT" get REKEY_KEY > /dev/null 2>&1 || OLD_KEY_EXIT=$?
+assert_eq "Old master passphrase is permanently rejected after rekey" "1" "$([[ $OLD_KEY_EXIT -ne 0 ]] && echo 1 || echo 0)"
+rm -f "$TEMP_REKEY_VAULT"
+unset CLOAK_MASTER_KEY || true
+
+echo ""
+echo ">>> [8/8] Testing GUI & Desktop App Assets..."
 pushd gui > /dev/null
 BUILD_RES=$(pnpm run build 2>&1)
 assert_contains "Frontend builds cleanly with pnpm" "built in" "$BUILD_RES"

@@ -71,7 +71,7 @@ pub struct ProxyState {
     pub port: u16,
     pub client: reqwest::Client,
     pub _prompt_lock: Mutex<()>,
-    pub session_token: String,
+    pub session_token: std::sync::RwLock<String>,
     pub pending_jit: Mutex<HashMap<String, (PendingJitRequest, JitResponseSender)>>,
     pub shutdown_tx: Option<tokio::sync::broadcast::Sender<()>>,
     pub ca: Arc<ca::CertificateAuthority>,
@@ -103,12 +103,16 @@ impl ProxyState {
             port,
             client,
             _prompt_lock: Mutex::new(()),
-            session_token,
+            session_token: std::sync::RwLock::new(session_token),
             pending_jit: Mutex::new(HashMap::new()),
             shutdown_tx,
             ca,
             rules,
         }
+    }
+
+    pub fn get_session_token(&self) -> String {
+        self.session_token.read().unwrap().clone()
     }
 
     pub async fn async_get(&self, namespace: &str, key: &str) -> Result<Option<Zeroizing<String>>> {
@@ -355,6 +359,25 @@ pub fn get_or_create_session_token() -> Result<String> {
     Ok(token)
 }
 
+pub fn rotate_session_token() -> Result<String> {
+    let path = token_file_path()?;
+    let mut bytes = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut bytes);
+    let token: String = bytes.iter().map(|b| format!("{:02x}", b)).collect();
+
+    let tmp_path = format!("{}.tmp.{}", path.display(), std::process::id());
+    std::fs::write(&tmp_path, &token)?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&tmp_path, std::fs::Permissions::from_mode(0o600));
+    }
+
+    std::fs::rename(&tmp_path, &path)?;
+    Ok(token)
+}
+
 pub fn constant_time_compare(a: &str, b: &str) -> bool {
     let a_bytes = a.as_bytes();
     let b_bytes = b.as_bytes();
@@ -437,7 +460,7 @@ async fn health_check(
     State(state): State<Arc<ProxyState>>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    let authenticated = verify_auth(&headers, &state.session_token);
+    let authenticated = verify_auth(&headers, &state.get_session_token());
     let mut json = serde_json::json!({
         "status": "active",
         "proxy": "Cloak Local AI Loopback Proxy",
@@ -473,7 +496,7 @@ async fn shutdown_handler(
     State(state): State<Arc<ProxyState>>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    if !verify_auth(&headers, &state.session_token) {
+    if !verify_auth(&headers, &state.get_session_token()) {
         return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
     }
     if let Some(tx) = &state.shutdown_tx {
@@ -496,7 +519,7 @@ async fn get_pending_jit_handler(
     State(state): State<Arc<ProxyState>>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    if !verify_auth(&headers, &state.session_token) {
+    if !verify_auth(&headers, &state.get_session_token()) {
         return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
     }
     let map = state.pending_jit.lock().await;
@@ -509,7 +532,7 @@ async fn respond_jit_handler(
     headers: HeaderMap,
     Json(payload): Json<JitDecisionPayload>,
 ) -> impl IntoResponse {
-    if !verify_auth(&headers, &state.session_token) {
+    if !verify_auth(&headers, &state.get_session_token()) {
         return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
     }
     let mut map = state.pending_jit.lock().await;
@@ -571,7 +594,7 @@ async fn submit_jit_handler(
     headers: HeaderMap,
     Json(payload): Json<SubmitJitPayload>,
 ) -> impl IntoResponse {
-    if !verify_auth(&headers, &state.session_token) {
+    if !verify_auth(&headers, &state.get_session_token()) {
         return (
             StatusCode::UNAUTHORIZED,
             Json(serde_json::json!({ "error": "Unauthorized session token" })),
@@ -605,6 +628,44 @@ async fn submit_jit_handler(
     }
 }
 
+async fn rotate_token_handler(
+    State(state): State<Arc<ProxyState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let current_token = state.get_session_token();
+    if !verify_auth(&headers, &current_token) {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({
+                "error": {
+                    "message": "Unauthorized proxy session token",
+                    "type": "unauthorized_proxy_client"
+                }
+            })),
+        )
+            .into_response();
+    }
+
+    match rotate_session_token() {
+        Ok(new_token) => {
+            *state.session_token.write().unwrap() = new_token.clone();
+            (
+                StatusCode::OK,
+                Json(serde_json::json!({
+                    "status": "rotated",
+                    "token": new_token
+                })),
+            )
+                .into_response()
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": format!("{e}") })),
+        )
+            .into_response(),
+    }
+}
+
 /// Generic Outbound Forwarding Gateway (`/cloak/forward`)
 ///
 /// Accepts arbitrary HTTP requests and forwards them to `X-Cloak-Target`.
@@ -615,7 +676,7 @@ async fn forward_gateway_handler(
     headers: HeaderMap,
     body: axum::body::Bytes,
 ) -> impl IntoResponse {
-    if !verify_auth(&headers, &state.session_token) {
+    if !verify_auth(&headers, &state.get_session_token()) {
         return (
             StatusCode::UNAUTHORIZED,
             Json(serde_json::json!({
@@ -828,7 +889,7 @@ pub async fn proxy_handler(
 
     // 1. Authenticate client (S1: Prevents drive-by browser requests)
     let headers = req.headers().clone();
-    if !verify_auth(&headers, &state.session_token) {
+    if !verify_auth(&headers, &state.get_session_token()) {
         return (
             StatusCode::UNAUTHORIZED,
             Json(serde_json::json!({
@@ -1148,6 +1209,7 @@ pub async fn start_proxy(store: Box<dyn SecretStore>, namespace: String, port: u
         .route("/cloak/jit/pending", get(get_pending_jit_handler))
         .route("/cloak/jit/respond", post(respond_jit_handler))
         .route("/cloak/jit/request", post(submit_jit_handler))
+        .route("/cloak/token/rotate", post(rotate_token_handler))
         .route(
             "/cloak/forward",
             axum::routing::any(forward_gateway_handler),
@@ -1465,5 +1527,18 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(key.as_str(), "secret-xyz");
+    }
+
+    #[tokio::test]
+    async fn test_session_token_rotation() {
+        let original_token = get_or_create_session_token().unwrap();
+        assert!(!original_token.is_empty());
+
+        let new_token = rotate_session_token().unwrap();
+        assert_ne!(original_token, new_token);
+        assert_eq!(new_token.len(), 64);
+
+        let fetched = get_or_create_session_token().unwrap();
+        assert_eq!(fetched, new_token);
     }
 }

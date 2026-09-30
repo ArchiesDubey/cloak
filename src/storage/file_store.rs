@@ -17,10 +17,23 @@ struct VaultFile {
     ciphertext: Vec<u8>,
 }
 
+fn current_timestamp() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
 #[derive(Serialize, Deserialize, Default)]
 struct VaultData {
     // namespace -> (key -> value)
     namespaces: HashMap<String, HashMap<String, String>>,
+    // namespace -> (key -> SecretMetadata)
+    #[serde(default)]
+    metadata: HashMap<String, HashMap<String, super::SecretMetadata>>,
+    // namespace -> (key -> previous_value)
+    #[serde(default)]
+    rollbacks: HashMap<String, HashMap<String, String>>,
 }
 
 pub struct FileStore {
@@ -68,6 +81,40 @@ impl FileStore {
         };
 
         Ok(Self { path, master_key })
+    }
+
+    /// Rekey the vault using a new passphrase, generating a new Argon2id salt and re-encrypting payload.
+    pub fn rekey(&mut self, new_passphrase: &[u8]) -> Result<()> {
+        let data = self.load_data()?;
+        let new_salt = crypto::generate_salt();
+        let new_key = crypto::derive_key(new_passphrase, &new_salt)?;
+        let raw_json = serde_json::to_vec(&data)?;
+        let (nonce, ciphertext) = crypto::encrypt_bytes(&new_key, &raw_json)?;
+        let vf = VaultFile {
+            salt: new_salt,
+            nonce,
+            ciphertext,
+        };
+        let serialized = serde_json::to_vec_pretty(&vf)?;
+        let tmp_path = format!("{}.tmp.rekey.{}", self.path.display(), std::process::id());
+        {
+            use std::io::Write;
+            let mut f = fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(&tmp_path)?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = f.set_permissions(fs::Permissions::from_mode(0o600));
+            }
+            f.write_all(&serialized)?;
+            f.sync_all()?;
+        }
+        fs::rename(&tmp_path, &self.path)?;
+        self.master_key = new_key;
+        Ok(())
     }
 
     fn load_data(&self) -> Result<VaultData> {
@@ -133,13 +180,100 @@ impl FileStore {
 }
 
 impl SecretStore for FileStore {
+    fn get_metadata(&self, namespace: &str, key: &str) -> Result<Option<super::SecretMetadata>> {
+        let data = self.load_data()?;
+        Ok(data
+            .metadata
+            .get(namespace)
+            .and_then(|ns| ns.get(key).cloned()))
+    }
+
     fn set(&self, namespace: &str, key: &str, value: &str) -> Result<()> {
+        let now = current_timestamp();
         let mut data = self.load_data()?;
         data.namespaces
             .entry(namespace.to_string())
             .or_default()
             .insert(key.to_string(), value.to_string());
+
+        let meta_map = data.metadata.entry(namespace.to_string()).or_default();
+        let prev_created = meta_map.get(key).map(|m| m.created_at).unwrap_or(0);
+        let created_at = if prev_created > 0 { prev_created } else { now };
+        let has_rollback = meta_map.get(key).map(|m| m.has_rollback).unwrap_or(false);
+        meta_map.insert(
+            key.to_string(),
+            super::SecretMetadata {
+                hardware_protected: false,
+                created_at,
+                last_rotated_at: now,
+                has_rollback,
+            },
+        );
+
         self.save_data(&data)
+    }
+
+    fn rotate(&self, namespace: &str, key: &str, new_value: &str) -> Result<()> {
+        let mut data = self.load_data()?;
+        let old_val = data
+            .namespaces
+            .get(namespace)
+            .and_then(|ns| ns.get(key).cloned());
+
+        if let Some(old) = old_val {
+            data.rollbacks
+                .entry(namespace.to_string())
+                .or_default()
+                .insert(key.to_string(), old);
+        }
+
+        data.namespaces
+            .entry(namespace.to_string())
+            .or_default()
+            .insert(key.to_string(), new_value.to_string());
+
+        let now = current_timestamp();
+        let meta_map = data.metadata.entry(namespace.to_string()).or_default();
+        let prev_created = meta_map.get(key).map(|m| m.created_at).unwrap_or(now);
+        meta_map.insert(
+            key.to_string(),
+            super::SecretMetadata {
+                hardware_protected: false,
+                created_at: prev_created,
+                last_rotated_at: now,
+                has_rollback: true,
+            },
+        );
+
+        self.save_data(&data)
+    }
+
+    fn rollback(&self, namespace: &str, key: &str) -> Result<Option<Zeroizing<String>>> {
+        let mut data = self.load_data()?;
+        let rollback_val = match data.rollbacks.get_mut(namespace).and_then(|ns| ns.remove(key)) {
+            Some(v) => v,
+            None => return Ok(None),
+        };
+
+        data.namespaces
+            .entry(namespace.to_string())
+            .or_default()
+            .insert(key.to_string(), rollback_val.clone());
+
+        let now = current_timestamp();
+        if let Some(meta_map) = data.metadata.get_mut(namespace) {
+            if let Some(info) = meta_map.get_mut(key) {
+                info.has_rollback = false;
+                info.last_rotated_at = now;
+            }
+        }
+
+        self.save_data(&data)?;
+        Ok(Some(Zeroizing::new(rollback_val)))
+    }
+
+    fn rekey(&mut self, new_passphrase: &[u8]) -> Result<()> {
+        Self::rekey(self, new_passphrase)
     }
 
     fn get(&self, namespace: &str, key: &str) -> Result<Option<Zeroizing<String>>> {
@@ -184,6 +318,12 @@ impl SecretStore for FileStore {
         let mut data = self.load_data()?;
         if let Some(ns) = data.namespaces.get_mut(namespace) {
             ns.remove(key);
+        }
+        if let Some(meta) = data.metadata.get_mut(namespace) {
+            meta.remove(key);
+        }
+        if let Some(rb) = data.rollbacks.get_mut(namespace) {
+            rb.remove(key);
         }
         self.save_data(&data)
     }
@@ -233,6 +373,90 @@ mod tests {
         assert!(store_bad.get("default", "API_KEY").is_err());
 
         // Cleanup
+        let _ = fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_file_store_rotate_and_rollback() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("cloak_test_rot_{}", rand::random::<u64>()));
+        let vault_path = temp_dir.join("vault.enc");
+        let password = b"passphrase-secret";
+
+        let store = FileStore::new(vault_path.clone(), password).unwrap();
+        store.set("default", "KEY_TO_ROTATE", "v1").unwrap();
+        assert_eq!(
+            store
+                .get("default", "KEY_TO_ROTATE")
+                .unwrap()
+                .as_deref()
+                .map(|s| s.as_str()),
+            Some("v1")
+        );
+
+        // Rotate
+        store.rotate("default", "KEY_TO_ROTATE", "v2").unwrap();
+        assert_eq!(
+            store
+                .get("default", "KEY_TO_ROTATE")
+                .unwrap()
+                .as_deref()
+                .map(|s| s.as_str()),
+            Some("v2")
+        );
+        let meta = store
+            .get_metadata("default", "KEY_TO_ROTATE")
+            .unwrap()
+            .unwrap();
+        assert!(meta.has_rollback);
+
+        // Rollback
+        let rolled_back = store.rollback("default", "KEY_TO_ROTATE").unwrap();
+        assert_eq!(
+            rolled_back.as_deref().map(|s| s.as_str()),
+            Some("v1")
+        );
+        assert_eq!(
+            store
+                .get("default", "KEY_TO_ROTATE")
+                .unwrap()
+                .as_deref()
+                .map(|s| s.as_str()),
+            Some("v1")
+        );
+
+        let _ = fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_file_store_rekey() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("cloak_test_rekey_{}", rand::random::<u64>()));
+        let vault_path = temp_dir.join("vault.enc");
+        let password = b"old-pass";
+        let new_password = b"new-pass";
+
+        let mut store = FileStore::new(vault_path.clone(), password).unwrap();
+        store.set("default", "SECRET", "super-secret").unwrap();
+
+        // Rekey
+        store.rekey(new_password).unwrap();
+
+        // Old password now fails
+        let store_old = FileStore::new(vault_path.clone(), password).unwrap();
+        assert!(store_old.get("default", "SECRET").is_err());
+
+        // New password succeeds
+        let store_new = FileStore::new(vault_path.clone(), new_password).unwrap();
+        assert_eq!(
+            store_new
+                .get("default", "SECRET")
+                .unwrap()
+                .as_deref()
+                .map(|s| s.as_str()),
+            Some("super-secret")
+        );
+
         let _ = fs::remove_dir_all(temp_dir);
     }
 }

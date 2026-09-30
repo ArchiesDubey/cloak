@@ -10,6 +10,8 @@ interface SecretListProps {
   onAddSecretClick: () => void;
   onCopySuccess: (key: string) => void;
   searchQuery?: string;
+  onRotate?: (secret: SecretItem, newValue: string) => Promise<void>;
+  onRollback?: (secret: SecretItem) => Promise<void>;
 }
 
 export const SecretList: React.FC<SecretListProps> = ({
@@ -19,6 +21,8 @@ export const SecretList: React.FC<SecretListProps> = ({
   onAddSecretClick,
   onCopySuccess,
   searchQuery = '',
+  onRotate,
+  onRollback,
 }) => {
   if (secrets.length === 0) {
     return (
@@ -54,6 +58,8 @@ export const SecretList: React.FC<SecretListProps> = ({
           onRevealToggle={onRevealToggle}
           onDelete={onDelete}
           onCopySuccess={onCopySuccess}
+          onRotate={onRotate}
+          onRollback={onRollback}
         />
       ))}
     </div>

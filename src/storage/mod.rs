@@ -7,6 +7,15 @@ use zeroize::Zeroizing;
 pub mod file_store;
 pub mod keyring_store;
 
+/// Metadata associated with a secret key (hardware security, creation time, rotation lifecycle).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SecretMetadata {
+    pub hardware_protected: bool,
+    pub created_at: u64,
+    pub last_rotated_at: u64,
+    pub has_rollback: bool,
+}
+
 /// Core trait implemented by storage backends (OS Keyring, Encrypted File).
 pub trait SecretStore: Send + Sync {
     /// Stores or updates a secret key-value pair under the specified namespace.
@@ -26,6 +35,26 @@ pub trait SecretStore: Send + Sync {
     /// Returns whether a stored secret is hardware-protected (Touch ID / Secure Enclave).
     fn is_hardware_protected(&self, _namespace: &str, _key: &str) -> bool {
         false
+    }
+
+    /// Retrieves lifecycle and security metadata for a secret.
+    fn get_metadata(&self, _namespace: &str, _key: &str) -> Result<Option<SecretMetadata>> {
+        Ok(None)
+    }
+
+    /// Rotates a secret key to a new value, preserving previous value for rollback.
+    fn rotate(&self, namespace: &str, key: &str, new_value: &str) -> Result<()> {
+        self.set(namespace, key, new_value)
+    }
+
+    /// Rolls back a secret to its previous value if a rollback version exists.
+    fn rollback(&self, _namespace: &str, _key: &str) -> Result<Option<Zeroizing<String>>> {
+        Ok(None)
+    }
+
+    /// Rekey the secret store with a new master passphrase (supported on file vaults).
+    fn rekey(&mut self, _new_passphrase: &[u8]) -> Result<()> {
+        anyhow::bail!("Rekeying is only supported on encrypted file vaults (--store file)");
     }
 
     /// Retrieves a secret value for a given key under the specified namespace.

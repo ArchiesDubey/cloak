@@ -156,6 +156,32 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleRotateSecret = async (secret: SecretItem, newValue: string) => {
+    try {
+      const scopeParam = secret.scope === 'project' ? (secret.project || 'cloak-core') : 'global';
+      await api.rotateSecret(secret.key, newValue, scopeParam);
+      const items = await api.listSecrets();
+      setSecrets(items);
+      showToast(`Rotated ${secret.key} (rollback saved)`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      showToast(`Rotate failed: ${message}`);
+    }
+  };
+
+  const handleRollbackSecret = async (secret: SecretItem) => {
+    try {
+      const scopeParam = secret.scope === 'project' ? (secret.project || 'cloak-core') : 'global';
+      await api.rollbackSecret(secret.key, scopeParam);
+      const items = await api.listSecrets();
+      setSecrets(items);
+      showToast(`Rolled back ${secret.key} to previous version`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      showToast(`Rollback failed: ${message}`);
+    }
+  };
+
   const handleSaveSecret = async (
     key: string,
     value: string,
@@ -433,6 +459,8 @@ export const App: React.FC = () => {
               onAddSecretClick={handleNewSecretClick}
               onCopySuccess={(key) => showToast(`Copied ${key} to clipboard`)}
               searchQuery={searchQuery}
+              onRotate={handleRotateSecret}
+              onRollback={handleRollbackSecret}
             />
           )}
         </div>
