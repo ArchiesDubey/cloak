@@ -117,6 +117,13 @@ Unauthenticated traffic (e.g. documentation, package downloads) passes through u
 ### Just-In-Time (JIT) Resolution
 If a script or agent requests a key that is missing, Cloak pauses execution and prompts for the credential directly on `stderr` (or displays an approval sheet in the Desktop HUD), allowing the process to continue without restarting.
 
+### Key Rotation, Rollback & Stale Auditing
+Cloak provides enterprise-grade key lifecycle management across 4 pillars:
+1. **Zero-Downtime Rotation & Rollback**: `cloak rotate <KEY> [NEW_VAL]` rotates credentials and automatically archives the previous version for atomic rollback (`cloak rotate <KEY> --rollback`). Pass `--verify` to probe upstream provider APIs (OpenAI, Anthropic, GitHub, Stripe) before committing the new secret.
+2. **Secret Age & Stale Auditing**: `cloak audit --days 90` flags credentials older than the configured threshold (`⚠️ STALE`), reporting security tiers (Hardware Enclave vs OS Keyring) and rollback readiness.
+3. **Standalone Vault Rekeying**: `cloak --store file rekey` re-derives encryption keys using fresh Argon2id salt and re-encrypts stored payloads in-place without plaintext exposure.
+4. **Session Token & Root CA Rotation**: `cloak proxy --rotate-token` rotates proxy credentials on the fly without interrupting client connections, and `cloak ca rotate` issues fresh Root CA keypairs with automated timestamped backups.
+
 ---
 
 ## CLI Reference
@@ -127,13 +134,18 @@ If a script or agent requests a key that is missing, Cloak pauses execution and 
 | `cloak set --touch-id <KEY>` | Store a secret protected by Touch ID (macOS) |
 | `cloak get <KEY>` | Print masked value (`sk-p••••••••9999`) |
 | `cloak get <KEY> --reveal` | Print raw unmasked value |
-| `cloak list` | List all stored secret names (values hidden) |
-| `cloak delete <KEY>` | Remove a secret from the vault |
+| `cloak list` | List all stored secret names with rotation age and status |
+| `cloak rotate <KEY> [VAL]` | Rotate a secret with optional `--verify` and `--rollback` |
+| `cloak audit [--days 90]` | Audit stored secrets for rotation staleness and security tiers |
+| `cloak rekey` | Rekey standalone encrypted file vault with a new passphrase |
+| `cloak delete <KEY>` | Remove a secret and its rollback version from the vault |
 | `cloak run -- <CMD>` | Execute command with secrets injected into memory |
 | `cloak run --proxy -- <CMD>` | Execute command with AI loopback & HTTPS proxy routing |
 | `cloak setup` | Configure Claude Code, Cursor, Antigravity, Windsurf, Copilot, Codex |
 | `cloak proxy` | Start the local AI loopback proxy daemon |
+| `cloak proxy --rotate-token` | Rotate proxy session authentication token |
 | `cloak ca install` | Install Cloak local CA to system trust store |
+| `cloak ca rotate` | Rotate local Root Certificate Authority and keys |
 | `cloak gui` | Open the Desktop HUD |
 
 ---

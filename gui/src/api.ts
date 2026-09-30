@@ -50,7 +50,6 @@ export const api = {
 
   async listSecrets(scope?: string): Promise<SecretItem[]> {
     if (isTauri()) {
-      // In desktop app, never fall back to mock data (A1 fix). Let errors surface!
       const dtos = await tauriInvoke<
         Array<{
           id: string;
@@ -59,6 +58,9 @@ export const api = {
           scope: string;
           updated_at: string;
           hardware_protected?: boolean;
+          created_at?: number;
+          last_rotated_at?: number;
+          has_rollback?: boolean;
         }>
       >('list_secrets');
 
@@ -75,6 +77,9 @@ export const api = {
           : 'api-key',
         hardwareStored: true,
         hardwareProtected: d.hardware_protected ?? false,
+        createdAt: d.created_at,
+        lastRotatedAt: d.last_rotated_at,
+        hasRollback: d.has_rollback,
       }));
 
       if (!scope || scope === 'all') {
@@ -178,6 +183,38 @@ export const api = {
 
     await delay(100);
     mockSecrets = mockSecrets.filter((s) => s.key !== key);
+    return true;
+  },
+
+  async rotateSecret(key: string, newValue: string, scope: string = 'global'): Promise<boolean> {
+    if (isTauri()) {
+      await tauriInvoke<void>('rotate_secret', { scope, key, newValue });
+      return true;
+    }
+    await delay(100);
+    const existing = mockSecrets.find((s) => s.key === key);
+    if (existing) {
+      existing.hasRollback = true;
+      existing.lastRotatedAt = Math.floor(Date.now() / 1000);
+      existing.fullValue = newValue;
+      const maskedPrefix = newValue.slice(0, Math.min(4, Math.floor(newValue.length / 3)));
+      const maskedSuffix = newValue.length > 8 ? newValue.slice(-4) : '';
+      existing.maskedValue = `${maskedPrefix}••••••••${maskedSuffix}`;
+    }
+    return true;
+  },
+
+  async rollbackSecret(key: string, scope: string = 'global'): Promise<boolean> {
+    if (isTauri()) {
+      await tauriInvoke<void>('rollback_secret', { scope, key });
+      return true;
+    }
+    await delay(100);
+    const existing = mockSecrets.find((s) => s.key === key);
+    if (existing) {
+      existing.hasRollback = false;
+      existing.lastRotatedAt = Math.floor(Date.now() / 1000);
+    }
     return true;
   },
 

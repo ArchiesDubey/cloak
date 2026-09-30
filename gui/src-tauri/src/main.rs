@@ -92,6 +92,12 @@ pub struct SecretItemDto {
     pub scope: String,
     pub updated_at: String,
     pub hardware_protected: bool,
+    #[serde(default)]
+    pub created_at: u64,
+    #[serde(default)]
+    pub last_rotated_at: u64,
+    #[serde(default)]
+    pub has_rollback: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -170,6 +176,12 @@ fn list_secrets(state: State<AppState>) -> Result<Vec<SecretItemDto>, String> {
         for key in keys {
             let masked = "••••••••••••••••".to_string();
             let hw_protected = store.is_hardware_protected(&ns, &key);
+            let meta = store.get_metadata(&ns, &key).ok().flatten();
+            let (created_at, last_rotated_at, has_rollback) = if let Some(m) = meta {
+                (m.created_at, m.last_rotated_at, m.has_rollback)
+            } else {
+                (0, 0, false)
+            };
 
             let scope_label = if ns == "global" {
                 "global".to_string()
@@ -190,6 +202,9 @@ fn list_secrets(state: State<AppState>) -> Result<Vec<SecretItemDto>, String> {
                     "Standard Keyring".to_string()
                 },
                 hardware_protected: hw_protected,
+                created_at,
+                last_rotated_at,
+                has_rollback,
             });
         }
     }
@@ -392,6 +407,77 @@ async fn delete_secret(
             Err(poisoned) => poisoned.into_inner(),
         };
         s.delete(&ns, &key).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn rotate_secret(
+    state: State<'_, AppState>,
+    scope: String,
+    key: String,
+    new_value: String,
+) -> Result<(), String> {
+    if !check_session_active(&state, true) {
+        return Err("Hardware Vault is locked. Authenticate to access.".to_string());
+    }
+
+    if key.trim().is_empty() {
+        return Err("Secret key name cannot be empty".to_string());
+    }
+    if new_value.trim().is_empty() {
+        return Err("Secret value cannot be empty".to_string());
+    }
+
+    let ns = if scope == "global" {
+        "global".to_string()
+    } else {
+        format!("proj-{}", scope)
+    };
+
+    let store = state.store.clone();
+    tokio::task::spawn_blocking(move || {
+        let s = match store.lock() {
+            Ok(g) => g,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        s.rotate(&ns, &key, &new_value).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn rollback_secret(
+    state: State<'_, AppState>,
+    scope: String,
+    key: String,
+) -> Result<(), String> {
+    if !check_session_active(&state, true) {
+        return Err("Hardware Vault is locked. Authenticate to access.".to_string());
+    }
+
+    if key.trim().is_empty() {
+        return Err("Secret key name cannot be empty".to_string());
+    }
+
+    let ns = if scope == "global" {
+        "global".to_string()
+    } else {
+        format!("proj-{}", scope)
+    };
+
+    let store = state.store.clone();
+    tokio::task::spawn_blocking(move || {
+        let s = match store.lock() {
+            Ok(g) => g,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        match s.rollback(&ns, &key).map_err(|e| e.to_string())? {
+            Some(_) => Ok(()),
+            None => Err(format!("No rollback version found for '{}'", key)),
+        }
     })
     .await
     .map_err(|e| e.to_string())?
@@ -910,6 +996,8 @@ fn main() {
             get_cli_status,
             install_cli_symlink,
             install_agent_rules,
+            rotate_secret,
+            rollback_secret,
         ])
         .run(tauri::generate_context!())
         .expect("error while running cloak desktop application");

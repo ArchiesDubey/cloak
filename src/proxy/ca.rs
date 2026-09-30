@@ -43,6 +43,28 @@ impl CertificateAuthority {
         Self::generate_and_save(&cert_path, &key_path)
     }
 
+    /// Rotates the Root CA by backing up old files and generating a fresh Root CA keypair.
+    pub fn rotate() -> Result<Self> {
+        let dir = ca_dir()?;
+        let cert_path = dir.join("ca.pem");
+        let key_path = dir.join("ca.key");
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        if cert_path.exists() {
+            let backup_cert = dir.join(format!("ca.pem.bak.{}", ts));
+            let _ = std::fs::copy(&cert_path, backup_cert);
+        }
+        if key_path.exists() {
+            let backup_key = dir.join(format!("ca.key.bak.{}", ts));
+            let _ = std::fs::copy(&key_path, backup_key);
+        }
+
+        Self::generate_and_save(&cert_path, &key_path)
+    }
+
     /// Creates a CA instance from in-memory PEM strings.
     pub fn from_pem(cert_pem: &str, key_pem: &str) -> Result<Self> {
         let key_pair = KeyPair::from_pem(key_pem).context("Failed to parse CA private key PEM")?;
@@ -325,5 +347,22 @@ mod tests {
         // Check caching
         let cached = ca.get_or_create_server_config("api.github.com").unwrap();
         assert!(Arc::ptr_eq(&server_config, &cached));
+    }
+
+    #[test]
+    fn test_ca_rotation() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("cloak_ca_test_{}", rand::random::<u64>()));
+        let cert_path = temp_dir.join("ca.pem");
+        let key_path = temp_dir.join("ca.key");
+
+        let ca1 = CertificateAuthority::generate_and_save(&cert_path, &key_path).unwrap();
+        assert!(cert_path.exists());
+        assert!(key_path.exists());
+
+        let ca2 = CertificateAuthority::generate_and_save(&cert_path, &key_path).unwrap();
+        assert_ne!(ca1.ca_cert_pem, ca2.ca_cert_pem);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
     }
 }

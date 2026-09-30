@@ -12,10 +12,23 @@ use zeroize::Zeroizing;
 
 const APP_NAME: &str = "cloak";
 
+fn current_timestamp() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct KeyInfo {
     #[serde(default)]
     pub hardware_protected: bool,
+    #[serde(default)]
+    pub created_at: u64,
+    #[serde(default)]
+    pub last_rotated_at: u64,
+    #[serde(default)]
+    pub has_rollback: bool,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -73,6 +86,9 @@ impl KeyringStore {
                                     k,
                                     KeyInfo {
                                         hardware_protected: false,
+                                        created_at: 0,
+                                        last_rotated_at: 0,
+                                        has_rollback: false,
                                     },
                                 );
                             }
@@ -139,6 +155,20 @@ impl SecretStore for KeyringStore {
             .unwrap_or(false)
     }
 
+    fn get_metadata(&self, namespace: &str, key: &str) -> Result<Option<super::SecretMetadata>> {
+        let meta = self.load_metadata();
+        if let Some(info) = meta.namespaces.get(namespace).and_then(|keys| keys.get(key)) {
+            Ok(Some(super::SecretMetadata {
+                hardware_protected: info.hardware_protected,
+                created_at: info.created_at,
+                last_rotated_at: info.last_rotated_at,
+                has_rollback: info.has_rollback,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
     fn set(&self, namespace: &str, key: &str, value: &str) -> Result<()> {
         let service = Self::service_name(namespace);
         let entry = Entry::new(&service, key).with_context(|| {
@@ -153,16 +183,21 @@ impl SecretStore for KeyringStore {
         }
 
         // Update metadata index
+        let now = current_timestamp();
         self.update_metadata(|meta| {
-            meta.namespaces
-                .entry(namespace.to_string())
-                .or_default()
-                .insert(
-                    key.to_string(),
-                    KeyInfo {
-                        hardware_protected: false,
-                    },
-                );
+            let ns_map = meta.namespaces.entry(namespace.to_string()).or_default();
+            let prev_created = ns_map.get(key).map(|i| i.created_at).unwrap_or(0);
+            let created_at = if prev_created > 0 { prev_created } else { now };
+            let has_rollback = ns_map.get(key).map(|i| i.has_rollback).unwrap_or(false);
+            ns_map.insert(
+                key.to_string(),
+                KeyInfo {
+                    hardware_protected: false,
+                    created_at,
+                    last_rotated_at: now,
+                    has_rollback,
+                },
+            );
         })?;
 
         Ok(())
@@ -211,22 +246,94 @@ impl SecretStore for KeyringStore {
             };
 
             // Update metadata index
+            let now = current_timestamp();
             self.update_metadata(|meta| {
-                meta.namespaces
-                    .entry(namespace.to_string())
-                    .or_default()
-                    .insert(
-                        key.to_string(),
-                        KeyInfo {
-                            hardware_protected: hardware_applied,
-                        },
-                    );
+                let ns_map = meta.namespaces.entry(namespace.to_string()).or_default();
+                let prev_created = ns_map.get(key).map(|i| i.created_at).unwrap_or(0);
+                let created_at = if prev_created > 0 { prev_created } else { now };
+                let has_rollback = ns_map.get(key).map(|i| i.has_rollback).unwrap_or(false);
+                ns_map.insert(
+                    key.to_string(),
+                    KeyInfo {
+                        hardware_protected: hardware_applied,
+                        created_at,
+                        last_rotated_at: now,
+                        has_rollback,
+                    },
+                );
             })?;
 
             return Ok(());
         }
 
         self.set(namespace, key, value)
+    }
+
+    fn rotate(&self, namespace: &str, key: &str, new_value: &str) -> Result<()> {
+        let service = Self::service_name(namespace);
+        let existing = self.get(namespace, key)?;
+        let hw = self.is_hardware_protected(namespace, key);
+
+        // If existing secret is present, save it to the rollback entry
+        if let Some(old_val) = existing {
+            let rollback_key = format!("{key}__cloak_rollback");
+            let rb_entry = Entry::new(&service, &rollback_key)?;
+            let _ = rb_entry.delete_credential();
+            rb_entry.set_password(&old_val)?;
+        }
+
+        // Save new value preserving hardware protection tier
+        if hw {
+            self.set_secure(namespace, key, new_value, true)?;
+        } else {
+            self.set(namespace, key, new_value)?;
+        }
+
+        // Mark has_rollback = true
+        let now = current_timestamp();
+        self.update_metadata(|meta| {
+            if let Some(ns_map) = meta.namespaces.get_mut(namespace) {
+                if let Some(info) = ns_map.get_mut(key) {
+                    info.has_rollback = true;
+                    info.last_rotated_at = now;
+                }
+            }
+        })?;
+
+        Ok(())
+    }
+
+    fn rollback(&self, namespace: &str, key: &str) -> Result<Option<Zeroizing<String>>> {
+        let service = Self::service_name(namespace);
+        let rollback_key = format!("{key}__cloak_rollback");
+        let rb_entry = Entry::new(&service, &rollback_key)?;
+
+        let old_val = match rb_entry.get_password() {
+            Ok(val) => val,
+            Err(keyring::Error::NoEntry) => return Ok(None),
+            Err(e) => return Err(anyhow::anyhow!("Failed to read rollback entry: {e}")),
+        };
+
+        let hw = self.is_hardware_protected(namespace, key);
+        if hw {
+            self.set_secure(namespace, key, &old_val, true)?;
+        } else {
+            self.set(namespace, key, &old_val)?;
+        }
+
+        let _ = rb_entry.delete_credential();
+
+        let now = current_timestamp();
+        self.update_metadata(|meta| {
+            if let Some(ns_map) = meta.namespaces.get_mut(namespace) {
+                if let Some(info) = ns_map.get_mut(key) {
+                    info.has_rollback = false;
+                    info.last_rotated_at = now;
+                }
+            }
+        })?;
+
+        Ok(Some(Zeroizing::new(old_val)))
     }
 
     fn get(&self, namespace: &str, key: &str) -> Result<Option<Zeroizing<String>>> {
@@ -270,6 +377,11 @@ impl SecretStore for KeyringStore {
         match entry.delete_credential() {
             Ok(_) | Err(keyring::Error::NoEntry) => {}
             Err(e) => return Err(anyhow::anyhow!("Failed to delete from keyring: {e}")),
+        }
+
+        let rollback_key = format!("{key}__cloak_rollback");
+        if let Ok(rb_entry) = Entry::new(&service, &rollback_key) {
+            let _ = rb_entry.delete_credential();
         }
 
         // Remove from metadata index
@@ -405,6 +517,41 @@ mod tests {
         store.set_secure(ns, key, val, true).unwrap();
         let fetched = store.get(ns, key).unwrap();
         assert_eq!(fetched.as_deref().map(|s| s.as_str()), Some(val));
+        store.delete(ns, key).unwrap();
+    }
+
+    #[test]
+    fn test_keyring_store_rotate_and_rollback() {
+        let store = KeyringStore::new().unwrap();
+        let ns = "test-rot-ns";
+        let key = "ROT_K1";
+
+        store.set(ns, key, "val_initial").unwrap();
+        assert_eq!(
+            store.get(ns, key).unwrap().as_deref().map(|s| s.as_str()),
+            Some("val_initial")
+        );
+
+        // Rotate
+        store.rotate(ns, key, "val_rotated").unwrap();
+        assert_eq!(
+            store.get(ns, key).unwrap().as_deref().map(|s| s.as_str()),
+            Some("val_rotated")
+        );
+        let meta = store.get_metadata(ns, key).unwrap().unwrap();
+        assert!(meta.has_rollback);
+
+        // Rollback
+        let rolled_back = store.rollback(ns, key).unwrap();
+        assert_eq!(
+            rolled_back.as_deref().map(|s| s.as_str()),
+            Some("val_initial")
+        );
+        assert_eq!(
+            store.get(ns, key).unwrap().as_deref().map(|s| s.as_str()),
+            Some("val_initial")
+        );
+
         store.delete(ns, key).unwrap();
     }
 }

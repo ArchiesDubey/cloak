@@ -11,6 +11,9 @@ export interface SecretItem {
   category: 'api-key' | 'database' | 'token' | 'certificate' | 'env';
   hardwareStored: boolean;
   hardwareProtected?: boolean;
+  createdAt?: number;
+  lastRotatedAt?: number;
+  hasRollback?: boolean;
 }
 
 export interface ProxyStatus {
