@@ -226,15 +226,6 @@ async fn reveal_secret(
         return Err("Secret key name cannot be empty".to_string());
     }
 
-    let prompt_msg = format!("Authenticate to reveal secret '{}'", key);
-    let auth_ok = tokio::task::spawn_blocking(move || platform_authenticate(&prompt_msg))
-        .await
-        .map_err(|e| e.to_string())??;
-
-    if !auth_ok {
-        return Err("Authentication cancelled or failed.".to_string());
-    }
-
     let ns = if scope == "global" {
         "global".to_string()
     } else {
